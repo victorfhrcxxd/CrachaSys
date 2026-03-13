@@ -4,9 +4,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, Search, CreditCard } from 'lucide-react';
+import { Download, Search, CreditCard, Pencil } from 'lucide-react';
 import BadgeTemplate from '@/components/BadgeTemplate';
 import QRCode from 'qrcode';
+import Link from 'next/link';
 
 interface Participant { id: string; name: string; email: string; company?: string; badgeRole: string; photo?: string; qrToken: string; }
 interface Event { id: string; name: string; }
@@ -82,11 +83,16 @@ export default function BadgesPage() {
               {events.map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
             </SelectContent>
           </Select>
-          {filtered.length > 0 && (
-            <Button variant="outline" onClick={handleDownloadAll} className="gap-2 ml-auto">
-              <Download className="w-4 h-4" />Baixar Todos ({filtered.length})
+          <div className="ml-auto flex items-center gap-2">
+            <Button variant="outline" asChild className="gap-1.5">
+              <Link href="/admin/badges/editor"><Pencil className="w-3.5 h-3.5" />Editor de Template</Link>
             </Button>
-          )}
+            {filtered.length > 0 && (
+              <Button variant="outline" onClick={handleDownloadAll} className="gap-1.5">
+                <Download className="w-3.5 h-3.5" />Baixar Todos ({filtered.length})
+              </Button>
+            )}
+          </div>
         </div>
 
         {loading ? (
