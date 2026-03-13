@@ -30,7 +30,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!isAdmin) return res.status(403).json({ error: 'Apenas administradores' });
 
   if (req.method === 'POST') {
-    const { name, email, company, document, phone, badgeRole, eventId } = req.body;
+    const { name, company, document, phone, badgeRole, eventId } = req.body;
+    const email = req.body.email?.toLowerCase?.() ?? '';
     if (!name || !email || !eventId) return res.status(400).json({ error: 'Campos obrigatórios ausentes' });
 
     const existing = await prisma.participant.findUnique({ where: { email_eventId: { email, eventId } } });

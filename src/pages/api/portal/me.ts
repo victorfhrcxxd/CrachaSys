@@ -8,11 +8,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const session = await getServerSession(req, res, authOptions);
   if (!session?.user?.email) return res.status(401).json({ error: 'Não autorizado' });
 
-  const email = session.user.email;
+  const email = session.user.email.toLowerCase();
 
-  // Find all participant records matching this email
+  // Find all participant records matching this email (case-insensitive)
   const participations = await prisma.participant.findMany({
-    where: { email },
+    where: { email: { equals: email, mode: 'insensitive' } },
     include: {
       event: { select: { id: true, name: true, description: true, location: true, startDate: true, endDate: true, workload: true, instructor: true, status: true } },
       checkins: { select: { id: true, checkedInAt: true, eventDay: { select: { date: true, label: true } } } },
