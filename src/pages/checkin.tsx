@@ -13,6 +13,7 @@ export default function CheckinPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const scannerRef = useRef<HTMLDivElement>(null);
+  const isProcessingRef = useRef(false);
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEventId, setSelectedEventId] = useState('');
   const [selectedDayId, setSelectedDayId] = useState('');
@@ -39,14 +40,15 @@ export default function CheckinPage() {
   const currentDays = currentEvent?.days ?? [];
 
   const handleScan = async (qrToken: string) => {
-    if (!selectedDayId) return;
+    if (!selectedDayId || isProcessingRef.current) return;
+    isProcessingRef.current = true;
     const res = await fetch('/api/checkin/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qrToken, eventDayId: selectedDayId }) });
     const data: ScanResult & { error?: string } = await res.json();
     setResult(data);
     if (data.participant) {
       setRecentCheckins(prev => [{ name: data.participant!.name, time: new Date().toLocaleTimeString('pt-BR'), duplicate: !!data.duplicate }, ...prev].slice(0, 10));
     }
-    setTimeout(() => setResult(null), 4000);
+    setTimeout(() => { setResult(null); isProcessingRef.current = false; }, 3500);
   };
 
   const startScanner = async () => {
@@ -69,6 +71,8 @@ export default function CheckinPage() {
   const stopScanner = async () => {
     if (scannerInstance) { try { await scannerInstance.stop(); } catch { /* */ } setScannerInstance(null); }
     setScanning(false);
+    isProcessingRef.current = false;
+    setResult(null);
   };
 
   if (status === 'loading' || !session) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" /></div>;

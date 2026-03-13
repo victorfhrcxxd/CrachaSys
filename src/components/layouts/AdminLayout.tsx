@@ -11,137 +11,177 @@ import {
   Menu,
   X,
   LogOut,
-  Bell,
   CreditCard,
   QrCode,
   BarChart3,
   ShieldCheck,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { Button } from '@/components/ui/button';
 
-const navItems = [
+const mainNav = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/admin/events', label: 'Eventos', icon: CalendarDays },
   { href: '/admin/participants', label: 'Participantes', icon: Users },
+  { href: '/checkin', label: 'Check-in QR', icon: QrCode },
+];
+
+const toolsNav = [
   { href: '/admin/badges', label: 'Crachás', icon: CreditCard },
   { href: '/admin/certificates', label: 'Certificados', icon: Award },
   { href: '/admin/reports', label: 'Relatórios', icon: BarChart3 },
-  { href: '/checkin', label: 'Check-in QR', icon: QrCode },
   { href: '/admin/users', label: 'Usuários', icon: UserCog },
   { href: '/admin/audit', label: 'Auditoria', icon: ShieldCheck },
 ];
 
+interface NavItemProps {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+  exact?: boolean;
+  onClick?: () => void;
+}
+
+function NavItem({ href, label, icon: Icon, exact, onClick }: NavItemProps) {
+  const router = useRouter();
+  const isActive = exact ? router.pathname === href : router.pathname.startsWith(href);
+
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      className={cn(
+        'group flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] font-medium transition-all duration-100',
+        isActive
+          ? 'bg-primary-subtle text-sidebar-active-fg'
+          : 'text-muted-foreground hover:text-foreground hover:bg-muted/70'
+      )}
+    >
+      <Icon
+        className={cn(
+          'w-[15px] h-[15px] flex-shrink-0 transition-colors',
+          isActive ? 'text-primary' : 'text-muted-foreground/60 group-hover:text-foreground'
+        )}
+      />
+      {label}
+    </Link>
+  );
+}
+
 interface AdminLayoutProps {
   children: React.ReactNode;
   title?: string;
+  description?: string;
+  actions?: React.ReactNode;
 }
 
-export default function AdminLayout({ children, title = 'Painel Administrativo' }: AdminLayoutProps) {
-  const router = useRouter();
+export default function AdminLayout({ children, title, description, actions }: AdminLayoutProps) {
   const { data: session } = useSession();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  const initials =
+    session?.user?.name
+      ?.split(' ')
+      .slice(0, 2)
+      .map((w) => w[0])
+      .join('')
+      .toUpperCase() ?? 'A';
+
+  const close = () => setSidebarOpen(false);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar overlay (mobile) */}
+    <div className="min-h-screen bg-background flex">
+      {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-20 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-20 lg:hidden"
+          onClick={close}
         />
       )}
 
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed top-0 left-0 h-full w-64 bg-white border-r border-gray-200 z-30 transition-transform duration-300 flex flex-col',
+          'fixed top-0 left-0 h-full w-[216px] bg-sidebar border-r border-sidebar-border z-30 flex flex-col transition-transform duration-200 ease-out',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
-        {/* Logo */}
-        <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-100">
-          <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center">
-            <CreditCard className="w-5 h-5 text-white" />
+        {/* Brand */}
+        <div className="flex items-center gap-2.5 h-[54px] px-4 border-b border-sidebar-border flex-shrink-0">
+          <div className="w-6 h-6 rounded-md bg-primary flex items-center justify-center flex-shrink-0">
+            <CreditCard className="w-3.5 h-3.5 text-primary-foreground" />
           </div>
-          <div>
-            <p className="font-bold text-gray-900 text-sm leading-none">CrachaSys</p>
-            <p className="text-xs text-gray-500 mt-0.5">Administrador</p>
-          </div>
+          <span className="font-semibold text-[13px] text-foreground tracking-tight">CrachaSys</span>
           <button
-            className="ml-auto lg:hidden text-gray-400 hover:text-gray-600"
-            onClick={() => setSidebarOpen(false)}
+            className="ml-auto lg:hidden text-muted-foreground hover:text-foreground"
+            onClick={close}
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {navItems.map((item) => {
-            const isActive = item.exact
-              ? router.pathname === item.href
-              : router.pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                )}
-              >
-                <item.icon className={cn('w-5 h-5', isActive ? 'text-blue-600' : 'text-gray-400')} />
-                {item.label}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5 scrollbar-hide">
+          {mainNav.map((item) => (
+            <NavItem key={item.href} {...item} onClick={close} />
+          ))}
+
+          <div className="pt-4 pb-1 px-2">
+            <p className="text-[10px] font-semibold text-muted-foreground/40 uppercase tracking-widest">
+              Ferramentas
+            </p>
+          </div>
+
+          {toolsNav.map((item) => (
+            <NavItem key={item.href} {...item} onClick={close} />
+          ))}
         </nav>
 
-        {/* User section */}
-        <div className="px-3 py-4 border-t border-gray-100">
-          <div className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50">
-            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-sm">
-              {session?.user?.name?.[0]?.toUpperCase() ?? 'A'}
+        {/* User */}
+        <div className="px-2 pb-3 pt-2 border-t border-sidebar-border flex-shrink-0 space-y-0.5">
+          <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md">
+            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[10px] font-bold flex-shrink-0">
+              {initials}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-[12px] font-medium text-foreground truncate leading-none">
                 {session?.user?.name ?? 'Administrador'}
               </p>
-              <p className="text-xs text-gray-500 truncate">{session?.user?.email}</p>
+              <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                {session?.user?.email}
+              </p>
             </div>
           </div>
           <button
             onClick={() => signOut({ callbackUrl: '/login' })}
-            className="w-full flex items-center gap-3 px-3 py-2 mt-1 rounded-lg text-sm text-red-600 hover:bg-red-50 transition-colors"
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[13px] text-muted-foreground hover:text-destructive hover:bg-destructive-subtle transition-colors"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-3.5 h-3.5" />
             Sair
           </button>
         </div>
       </aside>
 
-      {/* Main content */}
-      <div className="flex-1 lg:pl-64 flex flex-col min-h-screen">
-        {/* Top bar */}
-        <header className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 lg:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              className="lg:hidden text-gray-500 hover:text-gray-700"
-              onClick={() => setSidebarOpen(true)}
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            <h1 className="text-lg font-semibold text-gray-900">{title}</h1>
+      {/* Main */}
+      <div className="flex-1 lg:pl-[216px] flex flex-col min-h-screen">
+        {/* Topbar */}
+        <header className="sticky top-0 z-10 h-[54px] bg-surface/90 backdrop-blur-md border-b border-border flex items-center px-4 lg:px-6 gap-3">
+          <button
+            className="lg:hidden text-muted-foreground hover:text-foreground"
+            onClick={() => setSidebarOpen(true)}
+          >
+            <Menu className="w-4 h-4" />
+          </button>
+          <div className="flex-1 min-w-0">
+            {title && (
+              <h1 className="text-[13px] font-semibold text-foreground leading-none truncate">
+                {title}
+              </h1>
+            )}
+            {description && (
+              <p className="text-[12px] text-muted-foreground mt-0.5 truncate">{description}</p>
+            )}
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="text-gray-500">
-              <Bell className="w-5 h-5" />
-            </Button>
-          </div>
+          {actions && <div className="flex items-center gap-2 flex-shrink-0">{actions}</div>}
         </header>
 
         {/* Page content */}
