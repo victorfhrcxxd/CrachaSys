@@ -4,13 +4,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, Search, CreditCard, Pencil } from 'lucide-react';
+import { Download, Search, CreditCard, Pencil, Layers } from 'lucide-react';
 import BadgeTemplate from '@/components/BadgeTemplate';
+import BadgeRenderer, { BadgeDesign } from '@/components/BadgeRenderer';
 import QRCode from 'qrcode';
 import Link from 'next/link';
 
 interface Participant { id: string; name: string; email: string; company?: string; badgeRole: string; photo?: string; qrToken: string; }
 interface Event { id: string; name: string; }
+interface SavedTemplate { id: string; fileUrl: string; name: string; }
 
 export default function BadgesPage() {
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -21,6 +23,8 @@ export default function BadgesPage() {
   const [qrCodes, setQrCodes] = useState<Record<string, string>>({});
   const badgeRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [eventName, setEventName] = useState('');
+  const [activeTemplate, setActiveTemplate] = useState<BadgeDesign | null>(null);
+  const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/events').then(r => r.json()).then((data: Event[]) => {
@@ -33,13 +37,29 @@ export default function BadgesPage() {
   useEffect(() => {
     if (!selectedEventId) return;
     setLoading(true);
+    setActiveTemplate(null);
+    setActiveTemplateId(null);
+
     fetch(`/api/participants?eventId=${selectedEventId}`).then(r => r.json()).then((data: Participant[]) => {
       const ps = Array.isArray(data) ? data : [];
       setParticipants(ps);
       setLoading(false);
     });
+
     const ev = events.find(e => e.id === selectedEventId);
     if (ev) setEventName(ev.name);
+
+    fetch(`/api/badge-templates?eventId=${selectedEventId}`).then(r => r.json()).then((data: SavedTemplate[]) => {
+      if (!Array.isArray(data) || data.length === 0) return;
+      const first = data[0];
+      try {
+        const parsed = JSON.parse(first.fileUrl);
+        if (parsed?.design) {
+          setActiveTemplate(parsed.design as BadgeDesign);
+          setActiveTemplateId(first.id);
+        }
+      } catch { /* not a JSON template */ }
+    });
   }, [selectedEventId]);
 
   useEffect(() => {
@@ -59,7 +79,8 @@ export default function BadgesPage() {
     if (!el) return;
     const { default: html2canvas } = await import('html2canvas');
     const { default: jsPDF } = await import('jspdf');
-    const canvas = await html2canvas(el, { scale: 3, useCORS: true, backgroundColor: '#ffffff' });
+    const bg = activeTemplate?.background ?? '#ffffff';
+    const canvas = await html2canvas(el, { scale: 3, useCORS: true, backgroundColor: bg });
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [86, 120] });
     pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 86, 120);
     pdf.save(`cracha-${p.name.replace(/\s+/g, '-')}.pdf`);
@@ -84,8 +105,17 @@ export default function BadgesPage() {
             </SelectContent>
           </Select>
           <div className="ml-auto flex items-center gap-2">
+            {activeTemplate && activeTemplateId && (
+              <div className="flex items-center gap-1.5 text-[12px] text-primary bg-primary/8 px-2.5 py-1 rounded-md">
+                <Layers className="w-3 h-3" />
+                <span>Template personalizado</span>
+                <Link href={`/admin/badges/editor?id=${activeTemplateId}`} className="underline hover:no-underline ml-0.5">editar</Link>
+              </div>
+            )}
             <Button variant="outline" asChild className="gap-1.5">
-              <Link href="/admin/badges/editor"><Pencil className="w-3.5 h-3.5" />Editor de Template</Link>
+              <Link href={activeTemplateId ? `/admin/badges/editor?id=${activeTemplateId}` : '/admin/badges/editor'}>
+                <Pencil className="w-3.5 h-3.5" />Editor de Template
+              </Link>
             </Button>
             {filtered.length > 0 && (
               <Button variant="outline" onClick={handleDownloadAll} className="gap-1.5">
@@ -106,16 +136,31 @@ export default function BadgesPage() {
             {filtered.map(p => (
               <div key={p.id} className="flex flex-col items-center gap-3">
                 <div style={{ transform: 'scale(0.8)', transformOrigin: 'top center', marginBottom: '-60px' }}>
-                  <BadgeTemplate
-                    ref={el => { badgeRefs.current[p.id] = el; }}
-                    name={p.name}
-                    organization={p.company}
-                    courseName={eventName}
-                    badgeRole={p.badgeRole}
-                    badgeNumber={p.id.slice(-5).toUpperCase()}
-                    photoUrl={p.photo}
-                    qrCodeUrl={qrCodes[p.id]}
-                  />
+                  {activeTemplate ? (
+                    <BadgeRenderer
+                      ref={el => { badgeRefs.current[p.id] = el; }}
+                      design={activeTemplate}
+                      name={p.name}
+                      email={p.email}
+                      company={p.company}
+                      role={p.badgeRole}
+                      eventName={eventName}
+                      badgeNumber={p.id.slice(-5).toUpperCase()}
+                      photoUrl={p.photo}
+                      qrCodeUrl={qrCodes[p.id]}
+                    />
+                  ) : (
+                    <BadgeTemplate
+                      ref={el => { badgeRefs.current[p.id] = el; }}
+                      name={p.name}
+                      organization={p.company}
+                      courseName={eventName}
+                      badgeRole={p.badgeRole}
+                      badgeNumber={p.id.slice(-5).toUpperCase()}
+                      photoUrl={p.photo}
+                      qrCodeUrl={qrCodes[p.id]}
+                    />
+                  )}
                 </div>
                 <Button size="sm" variant="outline" onClick={() => handleDownload(p)} className="gap-2 w-full">
                   <CreditCard className="w-3.5 h-3.5" />Baixar PDF
