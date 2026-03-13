@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { ArrowLeft, Save, Download, Plus, Trash2, AlignLeft, AlignCenter, AlignRight, Bold } from 'lucide-react';
+import { ArrowLeft, Save, Download, Plus, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, ImagePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -10,7 +10,7 @@ import QRCode from 'qrcode';
 import { cn } from '@/utils/cn';
 
 // ── Types ──────────────────────────────────────────────────────────────────
-type ElemType = 'name' | 'email' | 'company' | 'role' | 'event' | 'badgeNumber' | 'qrcode' | 'photo' | 'text' | 'rect';
+type ElemType = 'name' | 'email' | 'company' | 'role' | 'event' | 'badgeNumber' | 'qrcode' | 'photo' | 'text' | 'rect' | 'image';
 
 interface BElem {
   id: string;
@@ -24,9 +24,10 @@ interface BElem {
   content?: string;
   bgColor?: string;
   borderRadius?: number;
+  imageData?: string;
 }
 
-interface Design { background: string; elements: BElem[] }
+interface Design { background: string; backgroundImage?: string; elements: BElem[] }
 interface EventItem { id: string; name: string }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -36,8 +37,17 @@ const H = 480;
 const LABELS: Record<ElemType, string> = {
   name: 'Nome', email: 'E-mail', company: 'Empresa', role: 'Função',
   event: 'Nome do Evento', badgeNumber: 'Nº Crachá', qrcode: 'QR Code',
-  photo: 'Foto', text: 'Texto Livre', rect: 'Retângulo',
+  photo: 'Foto', text: 'Texto Livre', rect: 'Retângulo', image: 'Imagem',
 };
+
+function readFileAsDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target?.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 const PREVIEW: Record<string, string> = {
   name: 'Maria Souza', email: 'maria@empresa.com', company: 'TechCorp',
@@ -55,6 +65,7 @@ const DEFAULTS: Partial<Record<ElemType, Partial<BElem>>> = {
   photo:       { width: 100, height: 100, borderRadius: 50 },
   text:        { width: 160, height: 28, fontSize: 12, color: '#0f172a',  align: 'center', content: 'Texto livre' },
   rect:        { width: 340, height: 8,  bgColor: '#4f46e5', borderRadius: 0 },
+  image:       { width: 160, height: 120, borderRadius: 0 },
 };
 
 // ── Starter Templates ──────────────────────────────────────────────────────
@@ -143,6 +154,18 @@ function ElemView({ elem, isSelected, onMouseDown, onResizeStart, qrUrl }: {
         {qrUrl
           ? <img src={qrUrl} alt="QR" style={{ width: '100%', height: '100%' }} />
           : <div style={{ width: '100%', height: '100%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: '#94a3b8' }}>QR</div>}
+      </div>
+    );
+  } else if (elem.type === 'image') {
+    node = (
+      <div style={{ ...base, overflow: 'hidden', borderRadius: elem.borderRadius ?? 0 }} onMouseDown={e => onMouseDown(e, elem.id)}>
+        {elem.imageData
+          ? <img src={elem.imageData} alt="img" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          : <div style={{ width: '100%', height: '100%', background: '#f1f5f9', border: '2px dashed #cbd5e1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+              <span style={{ fontSize: 9, color: '#94a3b8' }}>clique p/ upload</span>
+            </div>
+        }
       </div>
     );
   } else if (elem.type === 'photo') {
@@ -347,7 +370,28 @@ export default function BadgeEditorPage() {
   };
 
   const sel = design.elements.find(el => el.id === selected) ?? null;
-  const isText = (t: ElemType) => !['qrcode', 'photo', 'rect'].includes(t);
+  const isText = (t: ElemType) => !['qrcode', 'photo', 'rect', 'image'].includes(t);
+
+  const imgInputRef = useRef<HTMLInputElement>(null);
+  const bgInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageElemUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selected) return;
+    const data = await readFileAsDataURL(file);
+    updateSel({ imageData: data });
+    e.target.value = '';
+  };
+
+  const handleBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const data = await readFileAsDataURL(file);
+    setDesign(d => ({ ...d, backgroundImage: data }));
+    e.target.value = '';
+  };
+
+  const removeBgImage = () => setDesign(d => ({ ...d, backgroundImage: undefined }));
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden" style={{ userSelect: 'none' }}>
@@ -395,7 +439,7 @@ export default function BadgeEditorPage() {
           <div className="px-3 pt-2 pb-2 border-t border-sidebar-border">
             <p className="text-[10px] font-semibold text-muted-foreground/40 uppercase tracking-widest mb-2">Elementos</p>
             <div className="space-y-0.5">
-              {(['qrcode', 'photo', 'text', 'rect'] as ElemType[]).map(t => (
+              {(['qrcode', 'photo', 'image', 'text', 'rect'] as ElemType[]).map(t => (
                 <button key={t} onClick={() => addElem(t)}
                   className="w-full text-left text-[12px] px-2.5 py-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors flex items-center gap-2">
                   <Plus className="w-3 h-3 flex-shrink-0" />{LABELS[t]}
@@ -418,11 +462,26 @@ export default function BadgeEditorPage() {
 
           <div className="px-3 pt-2 pb-3 border-t border-sidebar-border mt-auto">
             <p className="text-[10px] font-semibold text-muted-foreground/40 uppercase tracking-widest mb-2">Fundo</p>
-            <div className="flex items-center gap-2">
-              <input type="color" value={design.background}
-                onChange={e => setDesign(d => ({ ...d, background: e.target.value }))}
-                className="w-7 h-7 rounded cursor-pointer border border-border p-0.5" />
-              <span className="text-[11px] text-muted-foreground font-mono">{design.background}</span>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input type="color" value={design.background}
+                  onChange={e => setDesign(d => ({ ...d, background: e.target.value }))}
+                  className="w-7 h-7 rounded cursor-pointer border border-border p-0.5" />
+                <span className="text-[11px] text-muted-foreground font-mono">{design.background}</span>
+              </div>
+              <input ref={bgInputRef} type="file" accept="image/*" className="hidden" onChange={handleBgUpload} />
+              {design.backgroundImage ? (
+                <div className="space-y-1">
+                  <div className="w-full h-16 rounded overflow-hidden border border-border">
+                    <img src={design.backgroundImage} alt="bg" className="w-full h-full object-cover" />
+                  </div>
+                  <button onClick={removeBgImage} className="w-full text-[11px] text-destructive hover:bg-destructive-subtle px-2 py-1 rounded border border-destructive/30 transition-colors">Remover imagem</button>
+                </div>
+              ) : (
+                <button onClick={() => bgInputRef.current?.click()} className="w-full flex items-center gap-1.5 text-[12px] px-2.5 py-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors border border-dashed border-border">
+                  <ImagePlus className="w-3.5 h-3.5 flex-shrink-0" />Upload de fundo
+                </button>
+              )}
             </div>
           </div>
         </aside>
@@ -435,7 +494,7 @@ export default function BadgeEditorPage() {
         >
           <div
             ref={canvasRef}
-            style={{ width: W, height: H, backgroundColor: design.background, position: 'relative', flexShrink: 0, boxShadow: '0 8px 40px rgba(0,0,0,0.20)', fontFamily: '"Inter","Helvetica Neue",sans-serif' }}
+            style={{ width: W, height: H, backgroundColor: design.background, backgroundImage: design.backgroundImage ? `url(${design.backgroundImage})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative', flexShrink: 0, boxShadow: '0 8px 40px rgba(0,0,0,0.20)', fontFamily: '"Inter","Helvetica Neue",sans-serif' }}
             onClick={e => e.stopPropagation()}
           >
             {design.elements.map(el => (
@@ -535,6 +594,32 @@ export default function BadgeEditorPage() {
                     <div className="flex items-center gap-1.5">
                       <label className="text-[10px] text-muted-foreground w-12 flex-shrink-0">Raio</label>
                       <Input type="number" value={sel.borderRadius || 0}
+                        onChange={e => updateSel({ borderRadius: +e.target.value })}
+                        className="h-6 text-[11px] px-1.5 flex-1 font-mono" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Image upload */}
+              {sel.type === 'image' && (
+                <div>
+                  <p className="text-[10px] text-muted-foreground/40 uppercase tracking-widest mb-2">Imagem</p>
+                  <div className="space-y-2">
+                    <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageElemUpload} />
+                    <button onClick={() => imgInputRef.current?.click()}
+                      className="w-full flex items-center justify-center gap-1.5 text-[12px] px-2.5 py-2 rounded-md border border-dashed border-border text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors">
+                      <ImagePlus className="w-3.5 h-3.5" />
+                      {sel.imageData ? 'Trocar imagem' : 'Upload de imagem'}
+                    </button>
+                    {sel.imageData && (
+                      <div className="w-full h-20 rounded overflow-hidden border border-border">
+                        <img src={sel.imageData} alt="preview" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-[10px] text-muted-foreground w-12 flex-shrink-0">Raio</label>
+                      <Input type="number" value={sel.borderRadius ?? 0}
                         onChange={e => updateSel({ borderRadius: +e.target.value })}
                         className="h-6 text-[11px] px-1.5 flex-1 font-mono" />
                     </div>
