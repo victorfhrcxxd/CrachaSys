@@ -1,0 +1,217 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Multi-tenant ────────────────────────────────────────────────────────────
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logo      String?
+  plan      String   @default("FREE")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  maxEvents       Int      @default(3)
+  maxParticipants  Int      @default(100)
+  maxCertificates  Int      @default(100)
+
+  users      User[]
+  events     Event[]
+  auditLogs  AuditLog[]
+
+  @@map("companies")
+}
+
+// ─── Users ───────────────────────────────────────────────────────────────────
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("MEMBER")
+  photo     String?
+  isActive  Boolean  @default(true)
+  companyId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company  Company? @relation(fields: [companyId], references: [id])
+  checkins CheckIn[]
+
+  @@map("users")
+}
+
+// ─── Events ──────────────────────────────────────────────────────────────────
+model Event {
+  id          String      @id @default(cuid())
+  name        String
+  description String?
+  location    String?
+  address     String?
+  city        String?
+  instructor  String?
+  workload    Int?
+  capacity    Int?
+  startDate   DateTime
+  endDate     DateTime
+  status      String      @default("UPCOMING")
+  slug        String?     @unique
+  isPublic    Boolean     @default(false)
+  companyId   String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  company              Company              @relation(fields: [companyId], references: [id])
+  days                 EventDay[]
+  participants         Participant[]
+  badgeTemplates       BadgeTemplate[]
+  certificateTemplates CertificateTemplate[]
+  certificates         Certificate[]
+  attendanceRule       AttendanceRule?
+  registrations        EventRegistration[]
+
+  @@map("events")
+}
+
+model EventDay {
+  id      String   @id @default(cuid())
+  date    DateTime
+  label   String?
+  eventId String
+
+  event    Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  checkins CheckIn[]
+
+  @@map("event_days")
+}
+
+model AttendanceRule {
+  id       String             @id @default(cuid())
+  eventId  String             @unique
+  ruleType String             @default("ALL_DAYS")
+  minDays  Int?
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@map("attendance_rules")
+}
+
+// ─── Participants ────────────────────────────────────────────────────────────
+model Participant {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  company   String?
+  document  String?
+  phone     String?
+  photo     String?
+  badgeRole String   @default("Participante")
+  qrToken   String   @unique @default(cuid())
+  eventId   String
+  createdAt DateTime @default(now())
+
+  event       Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  checkins    CheckIn[]
+  certificate Certificate?
+
+  @@unique([email, eventId])
+  @@map("participants")
+}
+
+// ─── Check-in ────────────────────────────────────────────────────────────────
+model CheckIn {
+  id            String   @id @default(cuid())
+  participantId String
+  eventDayId    String
+  checkedInAt   DateTime @default(now())
+  checkedInById String?
+
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  eventDay      EventDay    @relation(fields: [eventDayId], references: [id], onDelete: Cascade)
+  checkedInBy   User?       @relation(fields: [checkedInById], references: [id])
+
+  @@unique([participantId, eventDayId])
+  @@map("checkins")
+}
+
+// ─── Templates & Certificates ────────────────────────────────────────────────
+model BadgeTemplate {
+  id        String   @id @default(cuid())
+  name      String
+  fileUrl   String
+  eventId   String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@map("badge_templates")
+}
+
+model CertificateTemplate {
+  id        String   @id @default(cuid())
+  name      String
+  fileUrl   String?
+  content   String?
+  eventId   String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@map("certificate_templates")
+}
+
+model Certificate {
+  id               String   @id @default(cuid())
+  participantId    String   @unique
+  eventId          String
+  verificationCode String   @unique @default(cuid())
+  fileUrl          String?
+  issuedAt         DateTime @default(now())
+
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  event       Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@map("certificates")
+}
+
+// ─── Public Event Registration ────────────────────────────────────────────────
+model EventRegistration {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  company   String?
+  phone     String?
+  eventId   String
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([email, eventId])
+  @@map("event_registrations")
+}
+
+// ─── Audit Logs ───────────────────────────────────────────────────────────────
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  companyId String?
+  action    String
+  entity    String
+  entityId  String?
+  meta      String?
+  createdAt DateTime @default(now())
+
+  company Company? @relation(fields: [companyId], references: [id])
+
+  @@map("audit_logs")
+}
