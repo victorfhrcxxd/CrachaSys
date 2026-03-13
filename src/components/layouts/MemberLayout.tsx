@@ -11,14 +11,23 @@ import {
   X,
   LogOut,
   BookOpen,
+  ScanLine,
+  UserPlus,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
-const navItems = [
+const memberNav = [
   { href: '/portal', label: 'Início', icon: LayoutDashboard },
   { href: '/portal/courses', label: 'Meus Cursos', icon: BookOpen },
   { href: '/portal/badge', label: 'Meu Crachá', icon: CreditCard },
   { href: '/portal/certificates', label: 'Certificados', icon: Award },
+  { href: '/portal/profile', label: 'Meu Perfil', icon: User },
+];
+
+const staffNav = [
+  { href: '/portal', label: 'Painel', icon: LayoutDashboard },
+  { href: '/checkin', label: 'Scanner Check-in', icon: ScanLine },
+  { href: '/portal/register', label: 'Cadastrar Participante', icon: UserPlus },
   { href: '/portal/profile', label: 'Meu Perfil', icon: User },
 ];
 
@@ -31,6 +40,8 @@ export default function MemberLayout({ children, title = 'Portal do Participante
   const router = useRouter();
   const { data: session } = useSession();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isStaff = session?.user?.role === 'CREDENTIAL_STAFF';
+  const navItems = isStaff ? staffNav : memberNav;
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -53,7 +64,7 @@ export default function MemberLayout({ children, title = 'Portal do Participante
           </div>
           <div>
             <p className="font-bold text-gray-900 text-sm leading-none">CrachaSys</p>
-            <p className="text-xs text-gray-500 mt-0.5">Portal do Participante</p>
+            <p className="text-xs text-gray-500 mt-0.5">{isStaff ? 'Portal da Staff' : 'Portal do Participante'}</p>
           </div>
           <button
             className="ml-auto lg:hidden text-gray-400 hover:text-gray-600"

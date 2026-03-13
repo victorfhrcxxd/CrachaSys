@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import MemberLayout from '@/components/layouts/MemberLayout';
 import { Card, CardContent } from '@/components/ui/card';
-import { CalendarDays, Award, CreditCard, User, CheckSquare } from 'lucide-react';
+import { CalendarDays, Award, CreditCard, CheckSquare, ScanLine, UserPlus, ArrowRight } from 'lucide-react';
 import { formatDate } from '@/utils/cn';
 import Link from 'next/link';
 
@@ -14,6 +14,58 @@ interface Participation {
 interface Certificate { id: string; verificationCode: string; issuedAt: string; event: { name: string } | null; }
 interface PortalData { participations: Participation[]; certificates: Certificate[]; totalEvents: number; totalCertificates: number; totalCheckins: number; }
 
+function StaffDashboard({ name }: { name: string }) {
+  return (
+    <MemberLayout title="Painel da Staff">
+      <div className="space-y-6">
+        <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 text-white">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center text-2xl font-bold flex-shrink-0">
+              {name?.[0]?.toUpperCase() ?? 'S'}
+            </div>
+            <div>
+              <p className="text-indigo-200 text-sm">Bem-vindo(a), Staff</p>
+              <h2 className="text-xl font-bold">{name}</h2>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Link href="/checkin">
+            <Card className="hover:shadow-md transition-shadow cursor-pointer border-indigo-100 hover:border-indigo-300">
+              <CardContent className="p-6 flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-indigo-600 flex items-center justify-center flex-shrink-0">
+                  <ScanLine className="w-7 h-7 text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-gray-900 text-lg">Scanner Check-in</p>
+                  <p className="text-sm text-gray-500">Escanear QR Code dos participantes</p>
+                </div>
+                <ArrowRight className="w-5 h-5 text-gray-300" />
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/portal/register">
+            <Card className="hover:shadow-md transition-shadow cursor-pointer border-green-100 hover:border-green-300">
+              <CardContent className="p-6 flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-green-600 flex items-center justify-center flex-shrink-0">
+                  <UserPlus className="w-7 h-7 text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-gray-900 text-lg">Cadastrar Participante</p>
+                  <p className="text-sm text-gray-500">Registrar novo participante no evento</p>
+                </div>
+                <ArrowRight className="w-5 h-5 text-gray-300" />
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+      </div>
+    </MemberLayout>
+  );
+}
+
 export default function PortalHome() {
   const { data: session } = useSession();
   const [data, setData] = useState<PortalData | null>(null);
@@ -21,6 +73,10 @@ export default function PortalHome() {
   useEffect(() => {
     fetch('/api/portal/me').then(r => r.json()).then(setData);
   }, []);
+
+  if (session?.user?.role === 'CREDENTIAL_STAFF') {
+    return <StaffDashboard name={session.user.name ?? 'Staff'} />;
+  }
 
   return (
     <MemberLayout title="Início">
