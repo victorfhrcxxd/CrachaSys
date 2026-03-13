@@ -8,7 +8,11 @@ import { Download } from 'lucide-react';
 import BadgeTemplate from '@/components/BadgeTemplate';
 import QRCode from 'qrcode';
 
-interface Participation { id: string; badgeRole: string; qrToken: string; event: { id: string; name: string } }
+interface Participation {
+  id: string; badgeRole: string; qrToken: string;
+  event: { id: string; name: string };
+  certificate?: { verificationCode: string } | null;
+}
 
 export default function PortalBadge() {
   const { data: session } = useSession();
@@ -17,13 +21,21 @@ export default function PortalBadge() {
   const [qrUrl, setQrUrl] = useState('');
   const badgeRef = useRef<HTMLDivElement>(null);
 
+  const buildQrContent = (p: Participation) => {
+    if (p.certificate?.verificationCode) {
+      const base = typeof window !== 'undefined' ? window.location.origin : '';
+      return `${base}/certificate/${p.certificate.verificationCode}`;
+    }
+    return p.qrToken;
+  };
+
   useEffect(() => {
     fetch('/api/portal/me').then(r => r.json()).then(data => {
       const ps: Participation[] = data.participations ?? [];
       setParticipations(ps);
       if (ps.length > 0) {
         setSelectedId(ps[0].id);
-        QRCode.toDataURL(ps[0].qrToken, { width: 100, margin: 1 }).then(setQrUrl);
+        QRCode.toDataURL(buildQrContent(ps[0]), { width: 100, margin: 1 }).then(setQrUrl);
       }
     });
   }, []);
@@ -33,7 +45,7 @@ export default function PortalBadge() {
   const handleSelectChange = (id: string) => {
     setSelectedId(id);
     const p = participations.find(x => x.id === id);
-    if (p) QRCode.toDataURL(p.qrToken, { width: 100, margin: 1 }).then(setQrUrl);
+    if (p) QRCode.toDataURL(buildQrContent(p), { width: 100, margin: 1 }).then(setQrUrl);
   };
 
   const handleDownload = async () => {

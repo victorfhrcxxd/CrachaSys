@@ -10,7 +10,11 @@ import BadgeRenderer, { BadgeDesign } from '@/components/BadgeRenderer';
 import QRCode from 'qrcode';
 import Link from 'next/link';
 
-interface Participant { id: string; name: string; email: string; company?: string; badgeRole: string; photo?: string; qrToken: string; }
+interface Participant {
+  id: string; name: string; email: string; company?: string;
+  badgeRole: string; photo?: string; qrToken: string;
+  certificate?: { verificationCode: string } | null;
+}
 interface Event { id: string; name: string; }
 interface SavedTemplate { id: string; fileUrl: string; name: string; }
 
@@ -63,8 +67,12 @@ export default function BadgesPage() {
   }, [selectedEventId]);
 
   useEffect(() => {
+    const base = typeof window !== 'undefined' ? window.location.origin : '';
     participants.forEach(p => {
-      QRCode.toDataURL(p.qrToken, { width: 80, margin: 1 })
+      const qrContent = p.certificate?.verificationCode
+        ? `${base}/certificate/${p.certificate.verificationCode}`
+        : p.qrToken;
+      QRCode.toDataURL(qrContent, { width: 80, margin: 1 })
         .then(url => setQrCodes(prev => ({ ...prev, [p.id]: url })));
     });
   }, [participants]);
