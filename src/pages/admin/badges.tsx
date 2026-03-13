@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, Search, CreditCard, Pencil, Layers } from 'lucide-react';
+import { Download, Search, CreditCard, Pencil, Layers, Award, QrCode } from 'lucide-react';
 import BadgeTemplate from '@/components/BadgeTemplate';
 import BadgeRenderer, { BadgeDesign } from '@/components/BadgeRenderer';
 import QRCode from 'qrcode';
@@ -67,12 +67,12 @@ export default function BadgesPage() {
   }, [selectedEventId]);
 
   useEffect(() => {
+    if (participants.length === 0) return;
     const base = typeof window !== 'undefined' ? window.location.origin : '';
     participants.forEach(p => {
-      const qrContent = p.certificate?.verificationCode
-        ? `${base}/certificate/${p.certificate.verificationCode}`
-        : p.qrToken;
-      QRCode.toDataURL(qrContent, { width: 80, margin: 1 })
+      const code = p.certificate?.verificationCode;
+      const qrContent = code ? `${base}/certificate/${code}` : p.qrToken;
+      QRCode.toDataURL(qrContent, { width: 120, margin: 1, errorCorrectionLevel: 'M' })
         .then(url => setQrCodes(prev => ({ ...prev, [p.id]: url })));
     });
   }, [participants]);
@@ -143,6 +143,15 @@ export default function BadgesPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filtered.map(p => (
               <div key={p.id} className="flex flex-col items-center gap-3">
+                <div className={`w-full flex items-center justify-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md ${
+                  p.certificate?.verificationCode
+                    ? 'bg-green-50 text-green-700'
+                    : 'bg-slate-100 text-slate-500'
+                }`}>
+                  {p.certificate?.verificationCode
+                    ? <><Award className="w-3 h-3" />QR → Certificado</>  
+                    : <><QrCode className="w-3 h-3" />QR → Check-in</>}
+                </div>
                 <div style={{ transform: 'scale(0.8)', transformOrigin: 'top center', marginBottom: '-60px' }}>
                   {activeTemplate ? (
                     <BadgeRenderer
