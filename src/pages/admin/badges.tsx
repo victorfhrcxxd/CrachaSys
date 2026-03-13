@@ -88,7 +88,25 @@ export default function BadgesPage() {
     if (!el) return null;
     const { default: html2canvas } = await import('html2canvas');
     const bg = activeTemplate?.background ?? '#ffffff';
-    return html2canvas(el, { scale: 3, useCORS: true, backgroundColor: bg });
+
+    // Remove parent scale transform so html2canvas captures the full-size badge
+    const wrapper = el.parentElement;
+    const origTransform = wrapper?.style.transform ?? '';
+    const origMargin = wrapper?.style.marginBottom ?? '';
+    if (wrapper) {
+      wrapper.style.transform = 'none';
+      wrapper.style.marginBottom = '0';
+    }
+
+    const canvas = await html2canvas(el, { scale: 3, useCORS: true, backgroundColor: bg });
+
+    // Restore original transform
+    if (wrapper) {
+      wrapper.style.transform = origTransform;
+      wrapper.style.marginBottom = origMargin;
+    }
+
+    return canvas;
   };
 
   const handleDownload = async (p: Participant) => {
@@ -109,27 +127,36 @@ export default function BadgesPage() {
   const handleDownloadAll = async () => {
     if (filtered.length === 0) return;
     setDownloading(true);
-    const JSZip = (await import('jszip')).default;
-    const { saveAs } = await import('file-saver');
-    const { default: jsPDF } = await import('jspdf');
-    const zip = new JSZip();
+    try {
+      const JSZip = (await import('jszip')).default;
+      const { saveAs } = await import('file-saver');
+      const { default: jsPDF } = await import('jspdf');
+      const zip = new JSZip();
 
-    for (const p of filtered) {
-      const canvas = await captureBadge(p);
-      if (!canvas) continue;
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const badgeW = 86;
-      const badgeH = 120;
-      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', (pageW - badgeW) / 2, (pageH - badgeH) / 2, badgeW, badgeH);
-      const blob = pdf.output('arraybuffer');
-      zip.file(`cracha-${p.name.replace(/\s+/g, '-')}.pdf`, blob);
+      for (let i = 0; i < filtered.length; i++) {
+        const p = filtered[i];
+        const canvas = await captureBadge(p);
+        if (!canvas) continue;
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const pageW = pdf.internal.pageSize.getWidth();
+        const pageH = pdf.internal.pageSize.getHeight();
+        const badgeW = 86;
+        const badgeH = 120;
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', (pageW - badgeW) / 2, (pageH - badgeH) / 2, badgeW, badgeH);
+        const buf = pdf.output('arraybuffer');
+        zip.file(`cracha-${p.name.replace(/\s+/g, '-')}.pdf`, buf);
+        // Small delay to let browser breathe
+        await new Promise(r => setTimeout(r, 100));
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      saveAs(zipBlob, `crachas-${eventName.replace(/\s+/g, '-')}.zip`);
+    } catch (err) {
+      console.error('Erro ao gerar ZIP:', err);
+      alert('Erro ao gerar o arquivo ZIP. Tente novamente.');
+    } finally {
+      setDownloading(false);
     }
-
-    const zipBlob = await zip.generateAsync({ type: 'blob' });
-    saveAs(zipBlob, `crachas-${eventName.replace(/\s+/g, '-')}.zip`);
-    setDownloading(false);
   };
 
   return (
