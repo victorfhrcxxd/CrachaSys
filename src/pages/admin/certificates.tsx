@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Trash2, Award, User, CalendarDays, ExternalLink } from 'lucide-react';
+import { Plus, Search, Trash2, Award, User, CalendarDays, ExternalLink, Users, Percent } from 'lucide-react';
 import { formatDate } from '@/utils/cn';
 
 interface Certificate {
@@ -16,6 +16,7 @@ interface Certificate {
 }
 interface Participant { id: string; name: string; email: string; eventId: string; }
 interface Event { id: string; name: string; }
+interface BulkPreview { eligible: { id: string }[]; belowThresholdCount: number; totalParticipants: number; totalDays: number; }
 
 export default function CertificatesPage() {
   const [certs, setCerts] = useState<Certificate[]>([]);
@@ -24,7 +25,12 @@ export default function CertificatesPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
+  const [showBulkDialog, setShowBulkDialog] = useState(false);
   const [form, setForm] = useState({ participantId: '', eventId: '' });
+  const [bulkForm, setBulkForm] = useState({ eventId: '', minAttendancePercent: '75' });
+  const [bulkPreview, setBulkPreview] = useState<BulkPreview | null>(null);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkResult, setBulkResult] = useState<{ issued: number; alreadyHad: number } | null>(null);
   const [saving, setSaving] = useState(false);
 
   const load = () => {
@@ -53,6 +59,36 @@ export default function CertificatesPage() {
     setSaving(false); setShowDialog(false); setForm({ participantId: '', eventId: '' }); load();
   };
 
+  const loadBulkPreview = async (eventId: string, percent: string) => {
+    if (!eventId) return;
+    setBulkLoading(true);
+    const r = await fetch(`/api/certificates/bulk?eventId=${eventId}&minAttendancePercent=${percent}`);
+    const data = await r.json();
+    setBulkPreview(data);
+    setBulkLoading(false);
+  };
+
+  const handleBulkEventChange = (eventId: string) => {
+    setBulkForm(f => ({ ...f, eventId }));
+    setBulkResult(null);
+    loadBulkPreview(eventId, bulkForm.minAttendancePercent);
+  };
+
+  const handleBulkPercentChange = (percent: string) => {
+    setBulkForm(f => ({ ...f, minAttendancePercent: percent }));
+    setBulkResult(null);
+    if (bulkForm.eventId) loadBulkPreview(bulkForm.eventId, percent);
+  };
+
+  const handleBulkIssue = async () => {
+    setSaving(true);
+    const r = await fetch('/api/certificates/bulk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventId: bulkForm.eventId, minAttendancePercent: Number(bulkForm.minAttendancePercent) }) });
+    const data = await r.json();
+    setSaving(false);
+    setBulkResult(data);
+    load();
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir este certificado?')) return;
     await fetch(`/api/certificates/${id}`, { method: 'DELETE' });
@@ -67,9 +103,14 @@ export default function CertificatesPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <Input placeholder="Buscar certificados..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
           </div>
-          <Button onClick={() => { setForm({ participantId: '', eventId: '' }); setShowDialog(true); }} className="gap-2 ml-auto">
-            <Plus className="w-4 h-4" />Emitir Certificado
-          </Button>
+          <div className="flex gap-2 ml-auto">
+            <Button variant="outline" onClick={() => { setBulkForm({ eventId: '', minAttendancePercent: '75' }); setBulkPreview(null); setBulkResult(null); setShowBulkDialog(true); }} className="gap-2">
+              <Users className="w-4 h-4" />Emitir em Lote
+            </Button>
+            <Button onClick={() => { setForm({ participantId: '', eventId: '' }); setShowDialog(true); }} className="gap-2">
+              <Plus className="w-4 h-4" />Emitir Individual
+            </Button>
+          </div>
         </div>
 
         {loading ? (
@@ -109,9 +150,61 @@ export default function CertificatesPage() {
         )}
       </div>
 
+      {/* Bulk dialog */}
+      <Dialog open={showBulkDialog} onOpenChange={(v: boolean) => { setShowBulkDialog(v); if (!v) setBulkResult(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><Users className="w-5 h-5" />Emitir Certificados em Lote</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Evento *</Label>
+              <Select value={bulkForm.eventId} onValueChange={handleBulkEventChange}>
+                <SelectTrigger><SelectValue placeholder="Selecione o evento..." /></SelectTrigger>
+                <SelectContent>{events.map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1"><Percent className="w-3 h-3" />Percentual mínimo de presença</Label>
+              <div className="flex items-center gap-3">
+                <input type="range" min="0" max="100" step="5" value={bulkForm.minAttendancePercent} onChange={e => handleBulkPercentChange(e.target.value)} className="flex-1 accent-blue-600" />
+                <span className="w-14 text-center font-bold text-blue-700 bg-blue-50 rounded-lg py-1 text-sm">{bulkForm.minAttendancePercent}%</span>
+              </div>
+            </div>
+            {bulkForm.eventId && (
+              <div className={`rounded-xl p-4 text-sm space-y-1 ${bulkLoading ? 'bg-gray-50' : 'bg-blue-50 border border-blue-100'}`}>
+                {bulkLoading ? (
+                  <p className="text-gray-400 text-center">Calculando...</p>
+                ) : bulkPreview ? (
+                  <>
+                    <p className="font-semibold text-gray-700">Prévia da emissão</p>
+                    <p className="text-gray-600">Total de participantes: <span className="font-medium">{bulkPreview.totalParticipants}</span></p>
+                    <p className="text-gray-600">Dias do evento: <span className="font-medium">{bulkPreview.totalDays}</span></p>
+                    <p className="text-green-700 font-medium">✓ Elegíveis (≥{bulkForm.minAttendancePercent}% presença): {bulkPreview.eligible.length}</p>
+                    <p className="text-orange-600">✗ Abaixo do mínimo: {bulkPreview.belowThresholdCount}</p>
+                  </>
+                ) : null}
+              </div>
+            )}
+            {bulkResult && (
+              <div className="rounded-xl p-4 text-sm bg-green-50 border border-green-200 space-y-1">
+                <p className="font-semibold text-green-800">Emissão concluída!</p>
+                <p className="text-green-700">Certificados emitidos: <span className="font-bold">{bulkResult.issued}</span></p>
+                {bulkResult.alreadyHad > 0 && <p className="text-gray-500">Já possuíam certificado: {bulkResult.alreadyHad}</p>}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBulkDialog(false)}>Fechar</Button>
+            <Button onClick={handleBulkIssue} disabled={saving || !bulkForm.eventId || !bulkPreview || bulkPreview.eligible.length === 0}>
+              {saving ? 'Emitindo...' : `Emitir ${bulkPreview?.eligible?.length ?? 0} certificados`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Individual dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Emitir Certificado</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Emitir Certificado Individual</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label>Evento *</Label>
