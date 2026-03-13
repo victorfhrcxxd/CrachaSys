@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/router';
 import MemberLayout from '@/components/layouts/MemberLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,15 +14,18 @@ interface Certificate {
 }
 
 export default function PortalCertificates() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [certs, setCerts] = useState<Certificate[]>([]);
   const [loading, setLoading] = useState(true);
   const [printing, setPrinting] = useState<string | null>(null);
   const certRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
+    if (status === 'unauthenticated') { router.replace('/login'); return; }
+    if (status !== 'authenticated') return;
     fetch('/api/portal/me').then(r => r.json()).then(data => { setCerts(data.certificates ?? []); setLoading(false); });
-  }, []);
+  }, [status]);
 
   const handleDownload = async (cert: Certificate) => {
     const el = certRefs.current[cert.id];

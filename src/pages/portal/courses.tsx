@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/router';
 import MemberLayout from '@/components/layouts/MemberLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { CalendarDays, Calendar, MapPin, Clock, Users, CheckCircle2 } from 'lucide-react';
@@ -12,14 +14,18 @@ interface Participation {
 }
 
 export default function PortalCourses() {
+  const { status } = useSession();
+  const router = useRouter();
   const [participations, setParticipations] = useState<Participation[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (status === 'unauthenticated') { router.replace('/login'); return; }
+    if (status !== 'authenticated') return;
     fetch('/api/portal/me')
       .then(r => r.json())
       .then(data => { setParticipations(data.participations ?? []); setLoading(false); });
-  }, []);
+  }, [status]);
 
   return (
     <MemberLayout title="Meus Eventos">

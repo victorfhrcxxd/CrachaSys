@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/router';
 import MemberLayout from '@/components/layouts/MemberLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +16,8 @@ interface Participation {
 }
 
 export default function PortalBadge() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [participations, setParticipations] = useState<Participation[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [qrUrl, setQrUrl] = useState('');
@@ -27,6 +29,8 @@ export default function PortalBadge() {
   };
 
   useEffect(() => {
+    if (status === 'unauthenticated') { router.replace('/login'); return; }
+    if (status !== 'authenticated') return;
     fetch('/api/portal/me').then(r => r.json()).then(data => {
       const ps: Participation[] = data.participations ?? [];
       setParticipations(ps);
@@ -35,7 +39,7 @@ export default function PortalBadge() {
         QRCode.toDataURL(buildQrContent(ps[0]), { width: 100, margin: 1 }).then(setQrUrl);
       }
     });
-  }, []);
+  }, [status]);
 
   const selected = participations.find(p => p.id === selectedId);
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/router';
 import MemberLayout from '@/components/layouts/MemberLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { CalendarDays, Award, CreditCard, CheckSquare, ScanLine, UserPlus, ArrowRight } from 'lucide-react';
@@ -67,12 +68,15 @@ function StaffDashboard({ name }: { name: string }) {
 }
 
 export default function PortalHome() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [data, setData] = useState<PortalData | null>(null);
 
   useEffect(() => {
+    if (status === 'unauthenticated') { router.replace('/login'); return; }
+    if (status !== 'authenticated') return;
     fetch('/api/portal/me').then(r => r.json()).then(setData);
-  }, []);
+  }, [status]);
 
   if (session?.user?.role === 'CREDENTIAL_STAFF') {
     return <StaffDashboard name={session.user.name ?? 'Staff'} />;
