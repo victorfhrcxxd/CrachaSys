@@ -33,9 +33,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
   if (!participant) return res.status(404).json({ error: 'QR Code inválido — participante não encontrado' });
 
-  const eventDay = await prisma.eventDay.findUnique({ where: { id: eventDayId } });
+  const eventDay = await prisma.eventDay.findUnique({
+    where: { id: eventDayId },
+    include: { event: { select: { startDate: true, endDate: true, checkinWindowMinutes: true } } },
+  });
   if (!eventDay || eventDay.eventId !== participant.eventId) {
     return res.status(400).json({ error: 'Dia do evento inválido para este participante' });
+  }
+
+  // Validate check-in window
+  const now = new Date();
+  const windowMinutes = eventDay.event?.checkinWindowMinutes ?? 60;
+  const checkinOpensAt = new Date(new Date(eventDay.event!.startDate).getTime() - windowMinutes * 60 * 1000);
+  const checkinClosesAt = new Date(eventDay.event!.endDate);
+  if (now < checkinOpensAt) {
+    return res.status(400).json({
+      error: `Check-in disponível a partir de ${checkinOpensAt.toLocaleString('pt-BR')} (${windowMinutes} min antes do início)`,
+    });
+  }
+  if (now > checkinClosesAt) {
+    return res.status(400).json({ error: 'Check-in encerrado — o evento já foi concluído.' });
   }
 
   const existing = await prisma.checkIn.findUnique({

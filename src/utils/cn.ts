@@ -27,6 +27,15 @@ export function formatCPF(cpf: string): string {
   return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
 }
 
+export function computeEventStatus(startDate: string | Date, endDate: string | Date): string {
+  const now = new Date();
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (now < start) return 'UPCOMING';
+  if (now > end) return 'COMPLETED';
+  return 'ONGOING';
+}
+
 export function getStatusLabel(status: string): string {
   const labels: Record<string, string> = {
     UPCOMING: 'Próximo',

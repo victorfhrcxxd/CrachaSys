@@ -7,18 +7,18 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Search, Trash2, CalendarDays, MapPin, Users, Clock, ChevronRight, Edit } from 'lucide-react';
-import { formatDate, getStatusColor, getStatusLabel } from '@/utils/cn';
+import { formatDate, getStatusColor, getStatusLabel, computeEventStatus } from '@/utils/cn';
 import Link from 'next/link';
 
 interface EventDay { id?: string; date: string; label: string; }
 interface Event {
   id: string; name: string; description?: string; location?: string; address?: string; city?: string;
   instructor?: string; workload?: number; capacity?: number; startDate: string; endDate: string;
-  status: string; days: EventDay[]; _count: { participants: number; certificates: number };
+  status: string; checkinWindowMinutes?: number; days: EventDay[]; _count: { participants: number; certificates: number };
   attendanceRule?: { ruleType: string; minDays?: number };
 }
 
-const emptyForm = { name: '', description: '', location: '', address: '', city: '', instructor: '', workload: '', capacity: '', startDate: '', endDate: '', status: 'UPCOMING', ruleType: 'ALL_DAYS', minDays: '', days: [] as EventDay[] };
+const emptyForm = { name: '', description: '', location: '', address: '', city: '', instructor: '', workload: '', capacity: '', startDate: '', endDate: '', checkinWindowMinutes: '60', ruleType: 'ALL_DAYS', minDays: '', days: [] as EventDay[] };
 
 export default function EventsPage() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -41,7 +41,7 @@ export default function EventsPage() {
   const openCreate = () => { setEditing(null); setForm(emptyForm); setShowDialog(true); };
   const openEdit = (e: Event) => {
     setEditing(e);
-    setForm({ name: e.name, description: e.description ?? '', location: e.location ?? '', address: e.address ?? '', city: e.city ?? '', instructor: e.instructor ?? '', workload: String(e.workload ?? ''), capacity: String(e.capacity ?? ''), startDate: e.startDate.slice(0, 16), endDate: e.endDate.slice(0, 16), status: e.status, ruleType: e.attendanceRule?.ruleType ?? 'ALL_DAYS', minDays: String(e.attendanceRule?.minDays ?? ''), days: e.days.map(d => ({ id: d.id, date: d.date.slice(0, 10), label: d.label ?? '' })) });
+    setForm({ name: e.name, description: e.description ?? '', location: e.location ?? '', address: e.address ?? '', city: e.city ?? '', instructor: e.instructor ?? '', workload: String(e.workload ?? ''), capacity: String(e.capacity ?? ''), startDate: e.startDate.slice(0, 16), endDate: e.endDate.slice(0, 16), checkinWindowMinutes: String(e.checkinWindowMinutes ?? 60), ruleType: e.attendanceRule?.ruleType ?? 'ALL_DAYS', minDays: String(e.attendanceRule?.minDays ?? ''), days: e.days.map(d => ({ id: d.id, date: d.date.slice(0, 10), label: d.label ?? '' })) });
     setShowDialog(true);
   };
 
@@ -54,7 +54,7 @@ export default function EventsPage() {
 
   const handleSave = async () => {
     setSaving(true);
-    const body = { ...form, workload: form.workload ? Number(form.workload) : null, capacity: form.capacity ? Number(form.capacity) : null, attendanceRule: { ruleType: form.ruleType, minDays: form.minDays ? Number(form.minDays) : null }, days: form.days };
+    const body = { ...form, workload: form.workload ? Number(form.workload) : null, capacity: form.capacity ? Number(form.capacity) : null, checkinWindowMinutes: form.checkinWindowMinutes ? Number(form.checkinWindowMinutes) : 60, attendanceRule: { ruleType: form.ruleType, minDays: form.minDays ? Number(form.minDays) : null }, days: form.days };
     const url = editing ? `/api/events/${editing.id}` : '/api/events';
     const method = editing ? 'PUT' : 'POST';
     await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -94,7 +94,7 @@ export default function EventsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
                         <h3 className="font-semibold text-gray-900">{e.name}</h3>
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${getStatusColor(e.status)}`}>{getStatusLabel(e.status)}</span>
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${getStatusColor(computeEventStatus(e.startDate, e.endDate))}`}>{getStatusLabel(computeEventStatus(e.startDate, e.endDate))}</span>
                       </div>
                       {e.description && <p className="text-sm text-gray-500 line-clamp-1 mb-2">{e.description}</p>}
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400">
@@ -134,17 +134,7 @@ export default function EventsPage() {
               <div className="space-y-2"><Label>Carga Horária (h)</Label><Input type="number" value={form.workload} onChange={e => setForm({...form, workload: e.target.value})} /></div>
               <div className="space-y-2"><Label>Início *</Label><Input type="datetime-local" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value})} /></div>
               <div className="space-y-2"><Label>Fim *</Label><Input type="datetime-local" value={form.endDate} onChange={e => setForm({...form, endDate: e.target.value})} /></div>
-              <div className="space-y-2"><Label>Status</Label>
-                <Select value={form.status} onValueChange={v => setForm({...form, status: v})}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="UPCOMING">Próximo</SelectItem>
-                    <SelectItem value="ONGOING">Em Andamento</SelectItem>
-                    <SelectItem value="COMPLETED">Concluído</SelectItem>
-                    <SelectItem value="CANCELLED">Cancelado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <div className="space-y-2"><Label>Janela de Check-in (min antes do início)</Label><Input type="number" min="0" value={form.checkinWindowMinutes} onChange={e => setForm({...form, checkinWindowMinutes: e.target.value})} placeholder="60" /></div>
               <div className="space-y-2"><Label>Regra de Frequência</Label>
                 <Select value={form.ruleType} onValueChange={v => setForm({...form, ruleType: v})}>
                   <SelectTrigger><SelectValue /></SelectTrigger>

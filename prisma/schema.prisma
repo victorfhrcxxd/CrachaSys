@@ -62,9 +62,10 @@ model Event {
   capacity    Int?
   startDate   DateTime
   endDate     DateTime
-  status      String      @default("UPCOMING")
-  slug        String?     @unique
-  isPublic    Boolean     @default(false)
+  status               String   @default("UPCOMING")
+  checkinWindowMinutes Int      @default(60)
+  slug                 String?  @unique
+  isPublic             Boolean  @default(false)
   companyId   String
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt

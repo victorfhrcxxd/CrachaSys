@@ -27,7 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'POST') {
     if (!isAdmin) return res.status(403).json({ error: 'Apenas administradores' });
-    const { name, description, location, address, city, instructor, workload, capacity, startDate, endDate, status, days, attendanceRule } = req.body;
+    const { name, description, location, address, city, instructor, workload, capacity, startDate, endDate, checkinWindowMinutes, days, attendanceRule } = req.body;
     if (!name || !startDate || !endDate || !companyId) return res.status(400).json({ error: 'Campos obrigatórios ausentes' });
 
     const limit = await checkPlanLimit(companyId, 'events');
@@ -40,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         capacity: capacity ? Number(capacity) : null,
         startDate: new Date(startDate),
         endDate: new Date(endDate),
-        status: status ?? 'UPCOMING',
+        checkinWindowMinutes: checkinWindowMinutes ? Number(checkinWindowMinutes) : 60,
         companyId,
         days: days?.length ? { create: days.map((d: { date: string; label?: string }) => ({ date: new Date(d.date), label: d.label })) } : undefined,
         attendanceRule: attendanceRule ? { create: { ruleType: attendanceRule.ruleType, minDays: attendanceRule.minDays ? Number(attendanceRule.minDays) : null } } : undefined,

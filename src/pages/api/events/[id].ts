@@ -26,7 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!isAdmin) return res.status(403).json({ error: 'Apenas administradores' });
 
   if (req.method === 'PUT') {
-    const { name, description, location, address, city, instructor, workload, capacity, startDate, endDate, status } = req.body;
+    const { name, description, location, address, city, instructor, workload, capacity, startDate, endDate, checkinWindowMinutes } = req.body;
     const updated = await prisma.event.update({
       where: { id },
       data: {
@@ -35,7 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         capacity: capacity != null ? Number(capacity) : null,
         startDate: startDate ? new Date(startDate) : undefined,
         endDate: endDate ? new Date(endDate) : undefined,
-        status,
+        checkinWindowMinutes: checkinWindowMinutes != null ? Number(checkinWindowMinutes) : undefined,
       },
       include: { days: true, attendanceRule: true },
     });
