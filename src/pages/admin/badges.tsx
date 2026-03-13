@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, Search, CreditCard, Pencil, Layers, Award, QrCode } from 'lucide-react';
+import { Download, Search, CreditCard, Pencil, Layers, Award, QrCode, Archive } from 'lucide-react';
 import BadgeTemplate from '@/components/BadgeTemplate';
 import BadgeRenderer, { BadgeDesign } from '@/components/BadgeRenderer';
 import QRCode from 'qrcode';
@@ -81,20 +81,55 @@ export default function BadgesPage() {
     p.email.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleDownload = async (p: Participant) => {
+  const [downloading, setDownloading] = useState(false);
+
+  const captureBadge = async (p: Participant) => {
     const el = badgeRefs.current[p.id];
-    if (!el) return;
+    if (!el) return null;
     const { default: html2canvas } = await import('html2canvas');
-    const { default: jsPDF } = await import('jspdf');
     const bg = activeTemplate?.background ?? '#ffffff';
-    const canvas = await html2canvas(el, { scale: 3, useCORS: true, backgroundColor: bg });
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [86, 120] });
-    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 86, 120);
+    return html2canvas(el, { scale: 3, useCORS: true, backgroundColor: bg });
+  };
+
+  const handleDownload = async (p: Participant) => {
+    const canvas = await captureBadge(p);
+    if (!canvas) return;
+    const { default: jsPDF } = await import('jspdf');
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const badgeW = 86;
+    const badgeH = 120;
+    const x = (pageW - badgeW) / 2;
+    const y = (pageH - badgeH) / 2;
+    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', x, y, badgeW, badgeH);
     pdf.save(`cracha-${p.name.replace(/\s+/g, '-')}.pdf`);
   };
 
   const handleDownloadAll = async () => {
-    for (const p of filtered) { await handleDownload(p); }
+    if (filtered.length === 0) return;
+    setDownloading(true);
+    const JSZip = (await import('jszip')).default;
+    const { saveAs } = await import('file-saver');
+    const { default: jsPDF } = await import('jspdf');
+    const zip = new JSZip();
+
+    for (const p of filtered) {
+      const canvas = await captureBadge(p);
+      if (!canvas) continue;
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const badgeW = 86;
+      const badgeH = 120;
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', (pageW - badgeW) / 2, (pageH - badgeH) / 2, badgeW, badgeH);
+      const blob = pdf.output('arraybuffer');
+      zip.file(`cracha-${p.name.replace(/\s+/g, '-')}.pdf`, blob);
+    }
+
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    saveAs(zipBlob, `crachas-${eventName.replace(/\s+/g, '-')}.zip`);
+    setDownloading(false);
   };
 
   return (
@@ -125,8 +160,10 @@ export default function BadgesPage() {
               </Link>
             </Button>
             {filtered.length > 0 && (
-              <Button variant="outline" onClick={handleDownloadAll} className="gap-1.5">
-                <Download className="w-3.5 h-3.5" />Baixar Todos ({filtered.length})
+              <Button variant="outline" onClick={handleDownloadAll} disabled={downloading} className="gap-1.5">
+                {downloading
+                  ? <><div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-current" />Gerando ZIP...</>
+                  : <><Archive className="w-3.5 h-3.5" />Baixar Todos ZIP ({filtered.length})</>}
               </Button>
             )}
           </div>

@@ -68,8 +68,12 @@ export default function MemberDetailPage() {
     const { default: jsPDF } = await import('jspdf');
     if (!badgeRef.current) return;
     const canvas = await html2canvas(badgeRef.current, { scale: 3, useCORS: true, backgroundColor: '#ffffff' });
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [86, 120] });
-    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 86, 120);
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const badgeW = 86;
+    const badgeH = 120;
+    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', (pageW - badgeW) / 2, (pageH - badgeH) / 2, badgeW, badgeH);
     pdf.save(`cracha-${member?.name.replace(/\s+/g, '-')}.pdf`);
   };
 
