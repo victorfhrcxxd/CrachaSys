@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { QrCode, CheckCircle2, XCircle, AlertCircle, LogOut, Camera, CameraOff } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertCircle, LogOut, Camera, CameraOff, ArrowLeft, ScanLine } from 'lucide-react';
 
 interface Event { id: string; name: string; days: { id: string; date: string; label?: string }[] }
 interface ScanResult { duplicate: boolean; message: string; participant?: { name: string; email: string; company?: string; badgeRole: string } }
@@ -75,97 +74,191 @@ export default function CheckinPage() {
     setResult(null);
   };
 
-  if (status === 'loading' || !session) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" /></div>;
+  const homeHref = session?.user?.role === 'CREDENTIAL_STAFF' ? '/portal' : '/admin';
+
+  if (status === 'loading' || !session) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+      </div>
+    );
+  }
+
+  const successCount = recentCheckins.filter(c => !c.duplicate).length;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col">
-      {/* Header */}
-      <header className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center"><QrCode className="w-4 h-4" /></div>
-        <div className="flex-1">
-          <p className="font-semibold text-sm">Check-in QR Code</p>
-          <p className="text-xs text-gray-400">{session.user?.name}</p>
+    <div className="min-h-screen bg-slate-50 flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+
+      {/* ── Result overlay ── */}
+      {result && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center p-6 text-white"
+          style={{
+            backgroundColor: result.error ? '#dc2626' : result.duplicate ? '#d97706' : '#16a34a',
+            animation: 'fadeIn 0.15s ease',
+          }}
+        >
+          <div className="flex flex-col items-center gap-4 text-center">
+            {result.error
+              ? <XCircle className="w-20 h-20 opacity-90" />
+              : result.duplicate
+                ? <AlertCircle className="w-20 h-20 opacity-90" />
+                : <CheckCircle2 className="w-20 h-20 opacity-90" />}
+            <p className="text-3xl font-bold tracking-tight">
+              {result.error ? 'Erro' : result.duplicate ? 'Já registrado' : 'Check-in OK!'}
+            </p>
+            {result.participant && (
+              <div className="space-y-1">
+                <p className="text-xl font-semibold">{result.participant.name}</p>
+                {result.participant.company && <p className="text-base opacity-80">{result.participant.company}</p>}
+                <span className="inline-block text-sm bg-white/25 px-3 py-0.5 rounded-full mt-1">
+                  {result.participant.badgeRole}
+                </span>
+              </div>
+            )}
+            {result.error && <p className="text-base opacity-90 max-w-xs">{result.error}</p>}
+            <p className="text-sm opacity-60 mt-2">Fechando automaticamente...</p>
+          </div>
         </div>
-        <button onClick={() => signOut({ callbackUrl: '/login' })} className="text-gray-400 hover:text-white">
-          <LogOut className="w-5 h-5" />
+      )}
+
+      {/* ── Header ── */}
+      <header className="bg-white border-b border-slate-200 px-4 flex items-center gap-3" style={{ height: 56 }}>
+        <Link
+          href={homeHref}
+          className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 transition-colors -ml-1"
+          style={{ touchAction: 'manipulation' }}
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </Link>
+        <div className="flex items-center gap-2 flex-1">
+          <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0">
+            <ScanLine className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <p className="text-[14px] font-semibold text-slate-900 leading-tight">Check-in</p>
+            <p className="text-[11px] text-slate-400 leading-tight">{session.user?.name}</p>
+          </div>
+        </div>
+        {recentCheckins.length > 0 && (
+          <div className="flex items-center gap-1 bg-green-50 text-green-700 text-[12px] font-semibold px-2.5 py-1 rounded-full">
+            <CheckCircle2 className="w-3.5 h-3.5" />{successCount}
+          </div>
+        )}
+        <button
+          onClick={() => signOut({ callbackUrl: '/login' })}
+          className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 transition-colors"
+          style={{ touchAction: 'manipulation' }}
+        >
+          <LogOut className="w-4.5 h-4.5" />
         </button>
       </header>
 
-      {/* Config */}
-      <div className="px-4 py-3 bg-gray-900 border-b border-gray-800 space-y-2">
-        <Select value={selectedEventId} onValueChange={v => { setSelectedEventId(v); const ev = events.find(e => e.id === v); if (ev?.days?.[0]) setSelectedDayId(ev.days[0].id); else setSelectedDayId(''); }}>
-          <SelectTrigger className="bg-gray-800 border-gray-700 text-white"><SelectValue placeholder="Selecionar evento..." /></SelectTrigger>
-          <SelectContent className="bg-gray-800 border-gray-700">{events.map(e => <SelectItem key={e.id} value={e.id} className="text-white">{e.name}</SelectItem>)}</SelectContent>
+      {/* ── Event & Day selectors ── */}
+      <div className="bg-white border-b border-slate-200 px-4 py-3 space-y-2">
+        <Select
+          value={selectedEventId}
+          onValueChange={v => {
+            setSelectedEventId(v);
+            const ev = events.find(e => e.id === v);
+            if (ev?.days?.[0]) setSelectedDayId(ev.days[0].id); else setSelectedDayId('');
+          }}
+        >
+          <SelectTrigger className="h-11 text-[14px] bg-slate-50 border-slate-200">
+            <SelectValue placeholder="Selecionar evento..." />
+          </SelectTrigger>
+          <SelectContent>
+            {events.map(e => <SelectItem key={e.id} value={e.id} className="text-[14px]">{e.name}</SelectItem>)}
+          </SelectContent>
         </Select>
+
         {currentDays.length > 0 && (
           <Select value={selectedDayId} onValueChange={setSelectedDayId}>
-            <SelectTrigger className="bg-gray-800 border-gray-700 text-white"><SelectValue placeholder="Selecionar dia..." /></SelectTrigger>
-            <SelectContent className="bg-gray-800 border-gray-700">
-              {currentDays.map(d => <SelectItem key={d.id} value={d.id} className="text-white">{d.label ?? new Date(d.date).toLocaleDateString('pt-BR')}</SelectItem>)}
+            <SelectTrigger className="h-11 text-[14px] bg-slate-50 border-slate-200">
+              <SelectValue placeholder="Selecionar dia..." />
+            </SelectTrigger>
+            <SelectContent>
+              {currentDays.map(d => (
+                <SelectItem key={d.id} value={d.id} className="text-[14px]">
+                  {d.label ?? new Date(d.date).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         )}
       </div>
 
-      {/* Scanner area */}
-      <div className="flex-1 flex flex-col items-center justify-start p-4 gap-4">
-        {/* Scan result feedback */}
-        {result && (
-          <div className={`w-full max-w-sm rounded-2xl p-4 text-center transition-all ${result.error ? 'bg-red-900/80 border border-red-700' : result.duplicate ? 'bg-yellow-900/80 border border-yellow-700' : 'bg-green-900/80 border border-green-700'}`}>
-            <div className="flex justify-center mb-2">
-              {result.error ? <XCircle className="w-10 h-10 text-red-400" /> : result.duplicate ? <AlertCircle className="w-10 h-10 text-yellow-400" /> : <CheckCircle2 className="w-10 h-10 text-green-400" />}
-            </div>
-            <p className="font-bold text-lg">{result.error ? 'Erro' : result.duplicate ? 'Duplicado' : 'Check-in OK!'}</p>
-            {result.participant && (
-              <div className="mt-2">
-                <p className="font-semibold">{result.participant.name}</p>
-                <p className="text-sm opacity-75">{result.participant.company}</p>
-                <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">{result.participant.badgeRole}</span>
-              </div>
-            )}
-            {result.error && <p className="text-sm mt-1 opacity-80">{result.error}</p>}
-          </div>
-        )}
+      {/* ── Scanner area ── */}
+      <div className="flex-1 flex flex-col items-center px-4 pt-5 pb-4 gap-4">
 
-        {/* QR Reader */}
+        {/* Viewfinder */}
         <div className="w-full max-w-sm">
-          <div id="qr-reader" ref={scannerRef} className={`w-full rounded-2xl overflow-hidden ${scanning ? 'ring-2 ring-indigo-500' : ''}`} />
+          <div
+            id="qr-reader"
+            ref={scannerRef}
+            className="w-full rounded-2xl overflow-hidden"
+            style={scanning ? { boxShadow: '0 0 0 3px #4f46e5' } : {}}
+          />
           {!scanning && (
-            <div className="w-full aspect-square max-w-sm bg-gray-900 rounded-2xl border-2 border-dashed border-gray-700 flex flex-col items-center justify-center gap-3 text-gray-400">
-              <Camera className="w-12 h-12" />
-              <p className="text-sm">Câmera inativa</p>
+            <div className="w-full aspect-square bg-white rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-3 text-slate-300">
+              <Camera className="w-14 h-14" />
+              <p className="text-[13px] text-slate-400">Câmera inativa</p>
             </div>
           )}
         </div>
 
-        <div className="flex gap-3">
-          {!scanning ? (
-            <Button onClick={startScanner} disabled={!selectedDayId} className="gap-2 bg-indigo-600 hover:bg-indigo-700 px-8">
-              <Camera className="w-4 h-4" />Iniciar Scanner
-            </Button>
-          ) : (
-            <Button onClick={stopScanner} variant="outline" className="gap-2 border-gray-600 text-white hover:bg-gray-800 px-8">
-              <CameraOff className="w-4 h-4" />Parar Scanner
-            </Button>
-          )}
-        </div>
+        {/* Start / Stop button */}
+        {!scanning ? (
+          <button
+            onClick={startScanner}
+            disabled={!selectedDayId}
+            style={{ touchAction: 'manipulation' }}
+            className="w-full max-w-sm h-14 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-semibold text-[15px] flex items-center justify-center gap-2.5 transition-colors"
+          >
+            <Camera className="w-5 h-5" />Iniciar Scanner
+          </button>
+        ) : (
+          <button
+            onClick={stopScanner}
+            style={{ touchAction: 'manipulation' }}
+            className="w-full max-w-sm h-14 rounded-2xl bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-semibold text-[15px] flex items-center justify-center gap-2.5 transition-colors border border-slate-200"
+          >
+            <CameraOff className="w-5 h-5" />Parar Scanner
+          </button>
+        )}
 
         {/* Recent check-ins */}
         {recentCheckins.length > 0 && (
           <div className="w-full max-w-sm">
-            <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide">Últimos check-ins</p>
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Últimos registros</p>
             <div className="space-y-1.5">
               {recentCheckins.map((c, i) => (
-                <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${c.duplicate ? 'bg-yellow-900/30' : 'bg-green-900/30'}`}>
-                  {c.duplicate ? <AlertCircle className="w-3.5 h-3.5 text-yellow-400 flex-shrink-0" /> : <CheckCircle2 className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />}
-                  <span className="flex-1 truncate">{c.name}</span>
-                  <span className="text-gray-500 text-xs">{c.time}</span>
+                <div
+                  key={i}
+                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] ${
+                    c.duplicate ? 'bg-amber-50 border border-amber-100' : 'bg-green-50 border border-green-100'
+                  }`}
+                >
+                  {c.duplicate
+                    ? <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                    : <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />}
+                  <span className="flex-1 font-medium text-slate-700 truncate">{c.name}</span>
+                  <span className="text-slate-400 text-[11px] flex-shrink-0">{c.time}</span>
                 </div>
               ))}
             </div>
           </div>
         )}
       </div>
+
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+        #qr-reader video { border-radius: 1rem; }
+        #qr-reader img { display: none !important; }
+        #qr-reader__scan_region { border-radius: 1rem; }
+        #qr-reader__dashboard_section_swaplink { display: none !important; }
+        #qr-reader__dashboard { display: none !important; }
+      `}</style>
     </div>
   );
 }
