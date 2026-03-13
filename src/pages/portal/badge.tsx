@@ -22,11 +22,8 @@ export default function PortalBadge() {
   const badgeRef = useRef<HTMLDivElement>(null);
 
   const buildQrContent = (p: Participation) => {
-    if (p.certificate?.verificationCode) {
-      const base = typeof window !== 'undefined' ? window.location.origin : '';
-      return `${base}/certificate/${p.certificate.verificationCode}`;
-    }
-    return p.qrToken;
+    const base = typeof window !== 'undefined' ? window.location.origin : '';
+    return `${base}/qr/${p.qrToken}`;
   };
 
   useEffect(() => {

@@ -42,15 +42,11 @@ export default function CheckinPage() {
     if (!selectedDayId || isProcessingRef.current) return;
     isProcessingRef.current = true;
 
-    // QR aponta para certificado — abre em nova aba
-    const certMatch = decoded.match(/\/certificate\/([^/?#]+)/);
-    if (certMatch) {
-      window.open(decoded, '_blank', 'noopener');
-      setTimeout(() => { isProcessingRef.current = false; }, 3500);
-      return;
-    }
+    // Extrair token de URLs /qr/[token]
+    const qrMatch = decoded.match(/\/qr\/([^/?#]+)/);
+    const qrToken = qrMatch ? qrMatch[1] : decoded;
 
-    const res = await fetch('/api/checkin/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qrToken: decoded, eventDayId: selectedDayId }) });
+    const res = await fetch('/api/checkin/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qrToken, eventDayId: selectedDayId }) });
     const data: ScanResult & { error?: string } = await res.json();
     setResult(data);
     if (data.participant) {

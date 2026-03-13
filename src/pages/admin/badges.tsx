@@ -70,8 +70,7 @@ export default function BadgesPage() {
     if (participants.length === 0) return;
     const base = typeof window !== 'undefined' ? window.location.origin : '';
     participants.forEach(p => {
-      const code = p.certificate?.verificationCode;
-      const qrContent = code ? `${base}/certificate/${code}` : p.qrToken;
+      const qrContent = `${base}/qr/${p.qrToken}`;
       QRCode.toDataURL(qrContent, { width: 120, margin: 1, errorCorrectionLevel: 'M' })
         .then(url => setQrCodes(prev => ({ ...prev, [p.id]: url })));
     });
