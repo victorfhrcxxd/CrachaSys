@@ -63,9 +63,10 @@ const BadgeRenderer = React.forwardRef<HTMLDivElement, BadgeRendererProps>(
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           position: 'relative',
-          overflow: 'hidden',
+          overflow: 'visible',
           fontFamily: '"Inter","Helvetica Neue",Arial,sans-serif',
           flexShrink: 0,
+          boxSizing: 'border-box',
         }}
       >
         {design.elements.map(elem => {
@@ -130,9 +131,13 @@ const BadgeRenderer = React.forwardRef<HTMLDivElement, BadgeRendererProps>(
               justifyContent: elem.align === 'center' ? 'center' : elem.align === 'right' ? 'flex-end' : 'flex-start',
               fontSize: elem.fontSize || 14,
               fontWeight: elem.fontWeight || 'normal',
+              fontFamily: (elem as BElem & { fontFamily?: string }).fontFamily || '"Inter","Helvetica Neue",Arial,sans-serif',
               color: elem.color || '#0f172a',
-              overflow: 'hidden',
-              whiteSpace: 'nowrap',
+              overflow: 'visible',
+              whiteSpace: 'normal',
+              wordBreak: 'break-word',
+              lineHeight: 1.2,
+              textAlign: elem.align === 'center' ? 'center' : elem.align === 'right' ? 'right' : 'left',
             }}>
               {value}
             </div>

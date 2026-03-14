@@ -132,9 +132,11 @@ export function CertificateRenderer(props: CertificateRendererProps) {
               fontWeight: el.fontWeight || 'normal',
               fontFamily: el.fontFamily || '"Inter", sans-serif',
               color: el.color || '#0f172a',
-              whiteSpace: 'pre-wrap',
+              overflow: 'visible',
+              whiteSpace: 'normal',
               wordBreak: 'break-word',
-              overflow: 'hidden',
+              lineHeight: 1.2,
+              textAlign: el.align === 'center' ? 'center' : el.align === 'right' ? 'right' : 'left',
             }}>
               {value}
             </div>

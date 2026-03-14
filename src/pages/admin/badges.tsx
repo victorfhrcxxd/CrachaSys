@@ -26,6 +26,8 @@ export default function BadgesPage() {
   const badgeRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [activeTemplate, setActiveTemplate] = useState<BadgeDesign | null>(null);
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+
 
   const eventName = selectedEvent?.name ?? '';
 
@@ -97,31 +99,48 @@ export default function BadgesPage() {
     p.email.toLowerCase().includes(search.toLowerCase())
   );
 
-  const [downloading, setDownloading] = useState(false);
+  // ── Badge capture em alta qualidade ──────────────────────────────────────
+  // Dimensões reais do badge no editor
+  const BADGE_PX_W = 340;
+  const BADGE_PX_H = 480;
+  // Tamanho físico desejado no PDF (mm)
+  const BADGE_MM_W = 86;
+  const BADGE_MM_H = 120;
 
-  const captureBadge = async (p: Participant) => {
+  const captureBadge = async (p: Participant): Promise<HTMLCanvasElement | null> => {
     const el = badgeRefs.current[p.id];
     if (!el) return null;
     const { default: html2canvas } = await import('html2canvas');
     const bg = activeTemplate?.background ?? '#ffffff';
 
-    // Remove parent scale transform so html2canvas captures the full-size badge
-    const wrapper = el.parentElement;
-    const origTransform = wrapper?.style.transform ?? '';
-    const origMargin = wrapper?.style.marginBottom ?? '';
-    if (wrapper) {
-      wrapper.style.transform = 'none';
-      wrapper.style.marginBottom = '0';
-    }
+    // Cria um container fora da viewport para renderizar sem transform
+    const container = document.createElement('div');
+    container.style.cssText = `position:fixed;left:-9999px;top:-9999px;width:${BADGE_PX_W}px;height:${BADGE_PX_H}px;overflow:visible;`;
+    document.body.appendChild(container);
 
-    const canvas = await html2canvas(el, { scale: 3, useCORS: true, backgroundColor: bg });
+    // Clona o badge no container (sem scale CSS)
+    const clone = el.cloneNode(true) as HTMLElement;
+    clone.style.transform = 'none';
+    clone.style.marginBottom = '0';
+    clone.style.position = 'relative';
+    clone.style.width = `${BADGE_PX_W}px`;
+    clone.style.height = `${BADGE_PX_H}px`;
+    clone.style.overflow = 'visible';
+    container.appendChild(clone);
 
-    // Restore original transform
-    if (wrapper) {
-      wrapper.style.transform = origTransform;
-      wrapper.style.marginBottom = origMargin;
-    }
+    const canvas = await html2canvas(clone, {
+      scale: 4,           // 4× → ~384dpi para badge de 96dpi base — excelente para impressão
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: bg,
+      width: BADGE_PX_W,
+      height: BADGE_PX_H,
+      windowWidth: BADGE_PX_W,
+      windowHeight: BADGE_PX_H,
+      logging: false,
+    });
 
+    document.body.removeChild(container);
     return canvas;
   };
 
@@ -129,14 +148,9 @@ export default function BadgesPage() {
     const canvas = await captureBadge(p);
     if (!canvas) return;
     const { default: jsPDF } = await import('jspdf');
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const badgeW = 86;
-    const badgeH = 120;
-    const x = (pageW - badgeW) / 2;
-    const y = (pageH - badgeH) / 2;
-    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', x, y, badgeW, badgeH);
+    // PDF no tamanho exato do crachá (sem margem de página extra)
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [BADGE_MM_W, BADGE_MM_H] });
+    pdf.addImage(canvas.toDataURL('image/png', 1.0), 'PNG', 0, 0, BADGE_MM_W, BADGE_MM_H);
     pdf.save(`cracha-${p.name.replace(/\s+/g, '-')}.pdf`);
   };
 
@@ -153,16 +167,12 @@ export default function BadgesPage() {
         const p = filtered[i];
         const canvas = await captureBadge(p);
         if (!canvas) continue;
-        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-        const pageW = pdf.internal.pageSize.getWidth();
-        const pageH = pdf.internal.pageSize.getHeight();
-        const badgeW = 86;
-        const badgeH = 120;
-        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', (pageW - badgeW) / 2, (pageH - badgeH) / 2, badgeW, badgeH);
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [BADGE_MM_W, BADGE_MM_H] });
+        pdf.addImage(canvas.toDataURL('image/png', 1.0), 'PNG', 0, 0, BADGE_MM_W, BADGE_MM_H);
         const buf = pdf.output('arraybuffer');
         zip.file(`cracha-${p.name.replace(/\s+/g, '-')}.pdf`, buf);
-        // Small delay to let browser breathe
-        await new Promise(r => setTimeout(r, 100));
+        // Pequena pausa para o browser respirar
+        await new Promise(r => setTimeout(r, 80));
       }
 
       const zipBlob = await zip.generateAsync({ type: 'blob' });
