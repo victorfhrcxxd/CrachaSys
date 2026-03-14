@@ -10,7 +10,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     where: { verificationCode: code },
     include: {
       participant: { select: { name: true, email: true, company: true, badgeRole: true } },
-      event: { select: { name: true, startDate: true, endDate: true, location: true, city: true, instructor: true, workload: true } },
+      event: { select: { id: true, name: true, startDate: true, endDate: true, location: true, city: true, instructor: true, workload: true } },
     },
   });
 
