@@ -77,7 +77,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const region = process.env.STORAGE_REGION ?? 'us-east-1';
     const publicUrl = process.env.NEXT_PUBLIC_STORAGE_PUBLIC_URL;
 
-    const useS3 = !!(endpoint && accessKey && secretKey && bucket && publicUrl);
+    // Só usa S3 se o endpoint existir E não for localhost (MinIO local pode não estar rodando)
+    const isLocalEndpoint = !endpoint || endpoint.includes('localhost') || endpoint.includes('127.0.0.1');
+    const useS3 = !!(accessKey && secretKey && bucket && publicUrl && !isLocalEndpoint);
 
     if (useS3) {
       // ─── Upload via S3 (AWS / MinIO / Supabase Storage) ─────────────────

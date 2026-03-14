@@ -129,6 +129,8 @@ export default function ImportEventPage() {
     });
   };
 
+  const [uploadError, setUploadError] = useState('');
+
   const uploadImage = async (
     file: File,
     setUrl: (u: string) => void,
@@ -136,13 +138,24 @@ export default function ImportEventPage() {
     setLoading: (v: boolean) => void
   ) => {
     setLoading(true);
-    const fd = new FormData();
-    fd.append('file', file);
-    const res = await fetch('/api/upload', { method: 'POST', body: fd });
-    const data = await res.json();
-    setUrl(data.url ?? '');
-    setName(file.name);
-    setLoading(false);
+    setUploadError('');
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) {
+        setUploadError(data.error ?? 'Erro no upload. Tente novamente.');
+        return;
+      }
+      setUrl(data.url ?? '');
+      setName(file.name);
+    } catch (e) {
+      console.error('[uploadImage]', e);
+      setUploadError('Falha de conexão no upload. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleImport = async () => {
@@ -449,6 +462,13 @@ export default function ImportEventPage() {
                   />
                 </div>
               </div>
+
+              {uploadError && (
+                <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-xs">
+                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                  {uploadError}
+                </div>
+              )}
 
               <div className="flex justify-between pt-2">
                 <Button variant="outline" onClick={() => setStep(0)} className="gap-2">
