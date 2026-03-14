@@ -7,12 +7,10 @@ import type { SessionUser } from '../session';
 import * as StatsRepo from '../repositories/stats/stats.repository';
 
 export async function getDashboardStats(user: SessionUser) {
-  const scope = StatsRepo.buildScope(user.companyId, user.role === 'SUPER_ADMIN');
-
   const [counts, recentParticipants, upcomingEvents] = await Promise.all([
-    StatsRepo.countStats(scope),
-    StatsRepo.findRecentParticipants(scope),
-    StatsRepo.findUpcomingEvents(scope),
+    StatsRepo.countStats(user),
+    StatsRepo.findRecentParticipants(user),
+    StatsRepo.findUpcomingEvents(user),
   ]);
 
   return {

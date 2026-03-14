@@ -5,6 +5,7 @@ import { withApiHandler } from '@/server/handler';
 import { requireAdmin } from '@/server/session';
 import { ok, created, methodNotAllowed } from '@/server/response';
 import { parseBody } from '@/server/validators/common';
+import { tenantWhere } from '@/server/policies/company-scope';
 import { prisma } from '@/server/prisma';
 
 // POST é público (auto-cadastro de membro), GET requer admin
@@ -28,13 +29,12 @@ export default withApiHandler(async (req: NextApiRequest, res: NextApiResponse) 
   }
 
   if (req.method === 'GET') {
-    const admin        = await requireAdmin(req, res);
-    const { search }   = req.query;
-    const tenantFilter = admin.role === 'SUPER_ADMIN' ? {} : { companyId: admin.companyId };
+    const admin      = await requireAdmin(req, res);
+    const { search } = req.query;
     const members = await prisma.user.findMany({
       where: {
         role: 'MEMBER',
-        ...tenantFilter,
+        ...tenantWhere(admin),
         ...(search ? { OR: [{ name: { contains: String(search) } }, { email: { contains: String(search) } }] } : {}),
       },
       orderBy: { createdAt: 'desc' },

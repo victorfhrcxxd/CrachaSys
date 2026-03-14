@@ -4,45 +4,34 @@
  */
 
 import { prisma } from '../../prisma';
+import {
+  tenantWhere,
+  eventTenantWhere,
+  isSuperAdmin,
+} from '../../policies/company-scope';
+import type { SessionUser } from '../../session';
 
-export interface StatsScope {
-  eventWhere:       Record<string, unknown>;
-  participantWhere: Record<string, unknown>;
-  certificateWhere: Record<string, unknown>;
-  checkinWhere:     Record<string, unknown>;
-}
+export async function countStats(user: SessionUser) {
+  const eventW   = tenantWhere(user);
+  const byEvent  = eventTenantWhere(user);
+  const checkinW = isSuperAdmin(user)
+    ? {}
+    : { eventDay: { event: { companyId: user.companyId } } };
 
-export function buildScope(companyId: string, isSuperAdmin: boolean): StatsScope {
-  if (isSuperAdmin) {
-    return {
-      eventWhere:       {},
-      participantWhere: {},
-      certificateWhere: {},
-      checkinWhere:     {},
-    };
-  }
-  return {
-    eventWhere:       { companyId },
-    participantWhere: { event: { companyId } },
-    certificateWhere: { event: { companyId } },
-    checkinWhere:     { eventDay: { event: { companyId } } },
-  };
-}
-
-export async function countStats(scope: StatsScope) {
   const [totalEvents, totalParticipants, totalCertificates, totalCheckins] =
     await Promise.all([
-      prisma.event.count({ where: scope.eventWhere }),
-      prisma.participant.count({ where: scope.participantWhere }),
-      prisma.certificate.count({ where: scope.certificateWhere }),
-      prisma.checkIn.count({ where: scope.checkinWhere }),
+      prisma.event.count({ where: eventW }),
+      prisma.participant.count({ where: byEvent }),
+      prisma.certificate.count({ where: byEvent }),
+      prisma.checkIn.count({ where: checkinW }),
     ]);
+
   return { totalEvents, totalParticipants, totalCertificates, totalCheckins };
 }
 
-export async function findRecentParticipants(scope: StatsScope) {
+export async function findRecentParticipants(user: SessionUser) {
   return prisma.participant.findMany({
-    where: scope.participantWhere,
+    where: eventTenantWhere(user),
     orderBy: { createdAt: 'desc' },
     take: 5,
     select: {
@@ -53,9 +42,9 @@ export async function findRecentParticipants(scope: StatsScope) {
   });
 }
 
-export async function findUpcomingEvents(scope: StatsScope) {
+export async function findUpcomingEvents(user: SessionUser) {
   return prisma.event.findMany({
-    where: { ...scope.eventWhere, status: { in: ['UPCOMING', 'ONGOING'] } },
+    where: { ...tenantWhere(user), status: { in: ['UPCOMING', 'ONGOING'] } },
     orderBy: { startDate: 'asc' },
     take: 5,
     include: { _count: { select: { participants: true } } },

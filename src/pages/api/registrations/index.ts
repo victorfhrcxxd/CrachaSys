@@ -3,6 +3,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withApiHandler } from '@/server/handler';
 import { requireAdmin } from '@/server/session';
 import { ok, created, noContent, notFound, forbidden, methodNotAllowed } from '@/server/response';
+import { eventTenantWhere } from '@/server/policies/company-scope';
 import { prisma } from '@/server/prisma';
 import { parseBody } from '@/server/validators/common';
 
@@ -23,9 +24,8 @@ export default withApiHandler(async (req: NextApiRequest, res: NextApiResponse) 
 
   if (req.method === 'GET') {
     const { eventId } = req.query;
-    const tenantFilter = admin.role === 'SUPER_ADMIN' ? {} : { event: { companyId: admin.companyId } };
     const regs = await prisma.eventRegistration.findMany({
-      where: { ...(eventId ? { eventId: String(eventId) } : {}), ...tenantFilter },
+      where: { ...(eventId ? { eventId: String(eventId) } : {}), ...eventTenantWhere(admin) },
       orderBy: { createdAt: 'desc' },
     });
     return ok(res, regs);
