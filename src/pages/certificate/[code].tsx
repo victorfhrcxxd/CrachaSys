@@ -4,6 +4,7 @@ import Head from 'next/head';
 import { CheckCircle2, XCircle, Award, CalendarDays, MapPin, Clock, User, Building2, Loader2, Download } from 'lucide-react';
 import { formatDate } from '@/utils/cn';
 import { CertificateRenderer, CertDesign } from '@/components/CertificateRenderer';
+import { renderCertificateToCanvas } from '@/utils/canvasRenderer';
 
 interface CertData {
   id: string;
@@ -79,15 +80,23 @@ export default function CertificateVerificationPage() {
     if (!cert || !certDesign) return;
     setDownloading(true);
     try {
-      const el = document.getElementById('cert-canvas');
-      if (!el) return;
-      const { default: html2canvas } = await import('html2canvas');
       const { default: jsPDF } = await import('jspdf');
-      const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: certDesign.background });
+
+      // Usa Canvas 2D nativo (~150 DPI) — sem html2canvas / screenshot
+      const canvas = await renderCertificateToCanvas(certDesign, {
+        name: cert.participant.name,
+        company: cert.participant.company,
+        courseName: cert.event.name,
+        issueDate,
+        workload: workloadStr,
+        verificationCode: cert.verificationCode,
+        organization: cert.event.instructor ?? '',
+      });
+
       const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
       const pw = pdf.internal.pageSize.getWidth();
       const ph = pdf.internal.pageSize.getHeight();
-      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pw, ph);
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.97), 'JPEG', 0, 0, pw, ph);
       pdf.save(`certificado-${cert.participant.name.replace(/\s+/g, '-')}.pdf`);
     } finally {
       setDownloading(false);

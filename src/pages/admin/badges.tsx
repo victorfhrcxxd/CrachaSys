@@ -9,6 +9,7 @@ import BadgeRenderer, { BadgeDesign } from '@/components/BadgeRenderer';
 import QRCode from 'qrcode';
 import Link from 'next/link';
 import { useSelectedEvent } from '@/contexts/EventContext';
+import { renderBadgeToCanvas } from '@/utils/canvasRenderer';
 
 interface Participant {
   id: string; name: string; email: string; company?: string;
@@ -99,47 +100,36 @@ export default function BadgesPage() {
     p.email.toLowerCase().includes(search.toLowerCase())
   );
 
-  // ── Badge capture em alta qualidade ──────────────────────────────────────
-  // Dimensões reais do badge no editor
-  const BADGE_PX_W = 340;
-  const BADGE_PX_H = 480;
-  // Tamanho físico desejado no PDF (mm)
+  // ── PDF em alta qualidade via Canvas 2D nativo (300 DPI) ─────────────────
   const BADGE_MM_W = 86;
   const BADGE_MM_H = 120;
 
   const captureBadge = async (p: Participant): Promise<HTMLCanvasElement | null> => {
+    // Se tiver template do editor, usa renderizador Canvas 2D nativo (~300 DPI)
+    if (activeTemplate) {
+      return renderBadgeToCanvas(activeTemplate, {
+        name: p.name,
+        email: p.email,
+        company: p.company,
+        role: p.badgeRole,
+        eventName: eventName,
+        badgeNumber: p.id.slice(-5).toUpperCase(),
+        qrCodeUrl: qrCodes[p.id],
+        photoUrl: p.photo,
+      });
+    }
+
+    // Fallback: captura o BadgeTemplate padrão com html2canvas
     const el = badgeRefs.current[p.id];
     if (!el) return null;
     const { default: html2canvas } = await import('html2canvas');
-    const bg = activeTemplate?.background ?? '#ffffff';
-
-    // Cria um container fora da viewport para renderizar sem transform
     const container = document.createElement('div');
-    container.style.cssText = `position:fixed;left:-9999px;top:-9999px;width:${BADGE_PX_W}px;height:${BADGE_PX_H}px;overflow:visible;`;
+    container.style.cssText = 'position:fixed;left:-9999px;top:-9999px;overflow:visible;';
     document.body.appendChild(container);
-
-    // Clona o badge no container (sem scale CSS)
     const clone = el.cloneNode(true) as HTMLElement;
     clone.style.transform = 'none';
-    clone.style.marginBottom = '0';
-    clone.style.position = 'relative';
-    clone.style.width = `${BADGE_PX_W}px`;
-    clone.style.height = `${BADGE_PX_H}px`;
-    clone.style.overflow = 'visible';
     container.appendChild(clone);
-
-    const canvas = await html2canvas(clone, {
-      scale: 4,           // 4× → ~384dpi para badge de 96dpi base — excelente para impressão
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: bg,
-      width: BADGE_PX_W,
-      height: BADGE_PX_H,
-      windowWidth: BADGE_PX_W,
-      windowHeight: BADGE_PX_H,
-      logging: false,
-    });
-
+    const canvas = await html2canvas(clone, { scale: 4, useCORS: true, allowTaint: true, logging: false });
     document.body.removeChild(container);
     return canvas;
   };
@@ -148,9 +138,8 @@ export default function BadgesPage() {
     const canvas = await captureBadge(p);
     if (!canvas) return;
     const { default: jsPDF } = await import('jspdf');
-    // PDF no tamanho exato do crachá (sem margem de página extra)
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [BADGE_MM_W, BADGE_MM_H] });
-    pdf.addImage(canvas.toDataURL('image/png', 1.0), 'PNG', 0, 0, BADGE_MM_W, BADGE_MM_H);
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.97), 'JPEG', 0, 0, BADGE_MM_W, BADGE_MM_H);
     pdf.save(`cracha-${p.name.replace(/\s+/g, '-')}.pdf`);
   };
 
@@ -168,11 +157,10 @@ export default function BadgesPage() {
         const canvas = await captureBadge(p);
         if (!canvas) continue;
         const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [BADGE_MM_W, BADGE_MM_H] });
-        pdf.addImage(canvas.toDataURL('image/png', 1.0), 'PNG', 0, 0, BADGE_MM_W, BADGE_MM_H);
+        pdf.addImage(canvas.toDataURL('image/jpeg', 0.97), 'JPEG', 0, 0, BADGE_MM_W, BADGE_MM_H);
         const buf = pdf.output('arraybuffer');
         zip.file(`cracha-${p.name.replace(/\s+/g, '-')}.pdf`, buf);
-        // Pequena pausa para o browser respirar
-        await new Promise(r => setTimeout(r, 80));
+        await new Promise(r => setTimeout(r, 60));
       }
 
       const zipBlob = await zip.generateAsync({ type: 'blob' });
