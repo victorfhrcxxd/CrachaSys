@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Plus, Upload, Download, Users, CheckCircle2, QrCode, KeyRound, Copy,
-  UserCheck, AlertCircle,
+  UserCheck, AlertCircle, Mail,
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { useParticipantsManager } from '@/features/participants/hooks/useParticipantsManager';
@@ -16,6 +16,7 @@ import { ParticipantsFilters }     from '@/features/participants/components/Part
 import { ParticipantsTable }       from '@/features/participants/components/ParticipantsTable';
 import { ParticipantDetailsDrawer } from '@/features/participants/components/ParticipantDetailsDrawer';
 import { EMPTY_FILTERS, type RichParticipant } from '@/features/participants/utils/participantStatus';
+import { SendQrCodesModal } from '@/features/participants/components/SendQrCodesModal';
 
 // ── Types used only in this page ─────────────────────────────────────────────
 type QrTarget = { name: string; qrToken: string };
@@ -36,8 +37,9 @@ export default function ParticipantsPage() {
   } = useParticipantsManager(selectedEventId || null, currentEvent);
 
   // ── UI state ──────────────────────────────────────────────────────────────
-  const [showAdd,     setShowAdd]     = useState(false);
-  const [showImport,  setShowImport]  = useState(false);
+  const [showAdd,       setShowAdd]       = useState(false);
+  const [showImport,    setShowImport]    = useState(false);
+  const [showQrEmails,  setShowQrEmails]  = useState(false);
   const [drawer,      setDrawer]      = useState<RichParticipant | null>(null);
   const [showQr,      setShowQr]      = useState<QrTarget | null>(null);
   const [qrDataUrl,   setQrDataUrl]   = useState('');
@@ -183,6 +185,9 @@ export default function ParticipantsPage() {
       <Button variant="outline" size="sm" onClick={() => setShowImport(true)} className="gap-1.5">
         <Upload className="w-3.5 h-3.5" /> Importar CSV
       </Button>
+      <Button variant="outline" size="sm" onClick={() => setShowQrEmails(true)} disabled={!selectedEventId} className="gap-1.5">
+        <Mail className="w-3.5 h-3.5" /> Enviar QR Codes
+      </Button>
       <Button size="sm" onClick={() => setShowAdd(true)} disabled={!selectedEventId} className="gap-1.5">
         <Plus className="w-3.5 h-3.5" /> Adicionar
       </Button>
@@ -291,6 +296,15 @@ export default function ParticipantsPage() {
           </>
         )}
       </div>
+
+      {/* ── Send QR Codes modal ─────────────────────────────────────────── */}
+      <SendQrCodesModal
+        open={showQrEmails}
+        onClose={() => setShowQrEmails(false)}
+        onSuccess={refetch}
+        eventId={selectedEventId}
+        participants={raw}
+      />
 
       {/* ── Details drawer ──────────────────────────────────────────────── */}
       <ParticipantDetailsDrawer

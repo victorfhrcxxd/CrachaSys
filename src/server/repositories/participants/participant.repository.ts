@@ -97,3 +97,29 @@ export async function findEventForEmail(eventId: string) {
     select: { name: true, startDate: true, location: true },
   });
 }
+
+export async function findParticipantsForQrEmail(eventId: string, onlyNew: boolean) {
+  return prisma.participant.findMany({
+    where: {
+      eventId,
+      NOT: { email: '' },
+      ...(onlyNew ? { qrEmailSentAt: null } : {}),
+    },
+    select: {
+      id:       true,
+      name:     true,
+      email:    true,
+      badgeRole: true,
+      qrToken:  true,
+      qrEmailSentAt: true,
+    },
+    orderBy: { name: 'asc' },
+  });
+}
+
+export async function markQrEmailSent(participantId: string) {
+  return prisma.participant.update({
+    where: { id: participantId },
+    data:  { qrEmailSentAt: new Date() },
+  });
+}

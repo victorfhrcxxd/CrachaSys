@@ -115,9 +115,10 @@ model Participant {
   phone     String?
   photo     String?
   badgeRole String   @default("Participante")
-  qrToken   String   @unique @default(cuid())
-  eventId   String
-  createdAt DateTime @default(now())
+  qrToken       String    @unique @default(cuid())
+  qrEmailSentAt DateTime?
+  eventId       String
+  createdAt     DateTime  @default(now())
 
   event       Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
   checkins    CheckIn[]

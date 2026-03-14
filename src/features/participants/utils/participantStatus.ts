@@ -22,11 +22,12 @@ export interface RichParticipant {
   company?:   string | null;
   document?:  string | null;
   phone?:     string | null;
-  badgeRole:  string;
-  qrToken:    string;
-  createdAt:  string;
-  checkins:   CheckInRecord[];
-  certificate: CertificateRecord | null;
+  badgeRole:      string;
+  qrToken:        string;
+  qrEmailSentAt?: string | null;
+  createdAt:      string;
+  checkins:       CheckInRecord[];
+  certificate:    CertificateRecord | null;
 }
 
 // ── Status types ──────────────────────────────────────────────────────────────
