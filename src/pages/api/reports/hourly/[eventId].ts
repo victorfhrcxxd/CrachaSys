@@ -1,14 +1,19 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/server/auth';
+import { withApiHandler } from '@/server/handler';
+import { requireAuth } from '@/server/session';
+import { ok, notFound, methodNotAllowed } from '@/server/response';
+import { assertCompanyAccess } from '@/server/policies/access';
 import { prisma } from '@/server/prisma';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'GET') return res.status(405).json({ error: 'Método não permitido' });
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) return res.status(401).json({ error: 'Não autorizado' });
+export default withApiHandler(async (req: NextApiRequest, res: NextApiResponse) => {
+  if (req.method !== 'GET') return methodNotAllowed(res);
+  const user = await requireAuth(req, res);
 
   const { eventId } = req.query as { eventId: string };
+
+  const event = await prisma.event.findUnique({ where: { id: eventId }, select: { companyId: true } });
+  if (!event) return notFound(res, 'Evento não encontrado');
+  assertCompanyAccess(user, event.companyId);
 
   const checkins = await prisma.checkIn.findMany({
     where: { eventDay: { eventId } },
@@ -45,11 +50,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     rate: totalParticipants > 0 ? Math.round((d._count.checkins / totalParticipants) * 100) : 0,
   }));
 
-  return res.json({
+  return ok(res, {
     byHour,
     peak,
     attendanceRate,
     totalCheckins: checkins.length,
     totalParticipants,
   });
-}
+});

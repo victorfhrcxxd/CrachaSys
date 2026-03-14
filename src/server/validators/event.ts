@@ -35,5 +35,23 @@ export const UpdateEventSchema = CreateEventSchema.partial().extend({
   status: z.enum(['UPCOMING', 'ONGOING', 'FINISHED', 'CANCELLED']).optional(),
 });
 
-export type CreateEventInput = z.infer<typeof CreateEventSchema>;
-export type UpdateEventInput = z.infer<typeof UpdateEventSchema>;
+const ImportParticipantRowSchema = z.object({
+  name:      z.string().min(1),
+  email:     z.string().email(),
+  company:   z.string().optional(),
+  phone:     z.string().optional(),
+  document:  z.string().optional(),
+  badgeRole: z.string().optional(),
+});
+
+export const ImportFullEventSchema = z.object({
+  event:                  CreateEventSchema,
+  participants:           z.array(ImportParticipantRowSchema).optional(),
+  badgeTemplateUrl:       z.string().url().optional(),
+  certificateTemplateUrl: z.string().url().optional(),
+});
+
+export type CreateEventInput        = z.infer<typeof CreateEventSchema>;
+export type UpdateEventInput        = z.infer<typeof UpdateEventSchema>;
+export type ImportFullEventInput    = z.infer<typeof ImportFullEventSchema>;
+export type ImportParticipantRow    = z.infer<typeof ImportParticipantRowSchema>;

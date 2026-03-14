@@ -21,13 +21,20 @@ const UpdateUserSchema = z.object({
 });
 
 export default withApiHandler(async (req: NextApiRequest, res: NextApiResponse) => {
-  const admin = await requireAdmin(req, res);
-  const { id } = req.query as { id: string };
+  const admin   = await requireAdmin(req, res);
+  const { id }  = req.query as { id: string };
+
+  // Fetch target first so all branches can assert tenant scope
+  const target = await prisma.user.findUnique({ where: { id }, select: { ...userSelect, companyId: true } });
+  if (!target) return notFound(res, 'Usuário não encontrado');
+
+  // Cross-tenant guard (SUPER_ADMIN bypasses)
+  if (admin.role !== 'SUPER_ADMIN' && target.companyId !== admin.companyId) {
+    return forbidden(res, 'Acesso negado');
+  }
 
   if (req.method === 'GET') {
-    const user = await prisma.user.findUnique({ where: { id }, select: userSelect });
-    if (!user) return notFound(res, 'Usuário não encontrado');
-    return ok(res, user);
+    return ok(res, target);
   }
 
   if (req.method === 'PUT') {
@@ -44,8 +51,6 @@ export default withApiHandler(async (req: NextApiRequest, res: NextApiResponse) 
 
   if (req.method === 'DELETE') {
     if (id === admin.id) return forbidden(res, 'Não é possível excluir sua própria conta');
-    const target = await prisma.user.findUnique({ where: { id } });
-    if (!target) return notFound(res, 'Usuário não encontrado');
     await prisma.user.delete({ where: { id } });
     return noContent(res);
   }

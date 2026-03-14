@@ -20,17 +20,24 @@ const UpdateMemberSchema = z.object({
 });
 
 export default withApiHandler(async (req: NextApiRequest, res: NextApiResponse) => {
-  const viewer = await requireAuth(req, res);
+  const viewer  = await requireAuth(req, res);
   const { id }  = req.query as { id: string };
-
   const isAdmin = viewer.role === 'ADMIN' || viewer.role === 'SUPER_ADMIN';
   const isSelf  = viewer.id === id;
+
   if (!isAdmin && !isSelf) return forbidden(res, 'Acesso negado');
 
+  // Fetch target first so every branch can check tenant scope
+  const target = await prisma.user.findUnique({ where: { id }, select: { ...memberSelect, companyId: true } });
+  if (!target) return notFound(res, 'Usuário não encontrado');
+
+  // Cross-tenant guard: admins can only touch members of their own company
+  if (isAdmin && !isSelf && viewer.role !== 'SUPER_ADMIN') {
+    if (target.companyId !== viewer.companyId) return forbidden(res, 'Acesso negado');
+  }
+
   if (req.method === 'GET') {
-    const user = await prisma.user.findUnique({ where: { id }, select: memberSelect });
-    if (!user) return notFound(res, 'Usuário não encontrado');
-    return ok(res, user);
+    return ok(res, target);
   }
 
   if (req.method === 'PUT') {

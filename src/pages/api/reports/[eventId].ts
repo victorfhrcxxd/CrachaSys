@@ -1,15 +1,15 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/server/auth';
+import { withApiHandler } from '@/server/handler';
+import { requireAuth } from '@/server/session';
+import { ok, notFound, methodNotAllowed } from '@/server/response';
+import { assertCompanyAccess } from '@/server/policies/access';
 import { prisma } from '@/server/prisma';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'GET') return res.status(405).json({ error: 'Método não permitido' });
+export default withApiHandler(async (req: NextApiRequest, res: NextApiResponse) => {
+  if (req.method !== 'GET') return methodNotAllowed(res);
 
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) return res.status(401).json({ error: 'Não autorizado' });
-
-  const { eventId } = req.query as { eventId: string };
+  const user              = await requireAuth(req, res);
+  const { eventId }       = req.query as { eventId: string };
 
   const event = await prisma.event.findUnique({
     where: { id: eventId },
@@ -19,7 +19,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       _count: { select: { participants: true, certificates: true } },
     },
   });
-  if (!event) return res.status(404).json({ error: 'Evento não encontrado' });
+  if (!event) return notFound(res, 'Evento não encontrado');
+
+  assertCompanyAccess(user, event.companyId);
 
   const totalDays = event.days.length;
 
@@ -51,14 +53,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const attendanceByDay = event.days.map(day => ({
     label: day.label ?? new Date(day.date).toLocaleDateString('pt-BR'),
-    date: day.date,
+    date:  day.date,
     count: day._count.checkins,
   }));
 
-  return res.json({
+  return ok(res, {
     event: {
-      id: event.id,
-      name: event.name,
+      id:                event.id,
+      name:              event.name,
       totalDays,
       totalParticipants: event._count.participants,
       totalCertificates: event._count.certificates,
@@ -66,9 +68,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     attendanceByDay,
     participants: participantStats,
     summary: {
-      fullAttendance: participantStats.filter(p => p.attendedAllDays).length,
+      fullAttendance:    participantStats.filter(p => p.attendedAllDays).length,
       partialAttendance: participantStats.filter(p => p.daysAttended > 0 && !p.attendedAllDays).length,
-      noAttendance: participantStats.filter(p => p.daysAttended === 0).length,
+      noAttendance:      participantStats.filter(p => p.daysAttended === 0).length,
     },
   });
-}
+});

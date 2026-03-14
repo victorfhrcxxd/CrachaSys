@@ -28,11 +28,13 @@ export default withApiHandler(async (req: NextApiRequest, res: NextApiResponse) 
   }
 
   if (req.method === 'GET') {
-    const { search } = req.query;
-    await requireAdmin(req, res);
+    const admin        = await requireAdmin(req, res);
+    const { search }   = req.query;
+    const tenantFilter = admin.role === 'SUPER_ADMIN' ? {} : { companyId: admin.companyId };
     const members = await prisma.user.findMany({
       where: {
         role: 'MEMBER',
+        ...tenantFilter,
         ...(search ? { OR: [{ name: { contains: String(search) } }, { email: { contains: String(search) } }] } : {}),
       },
       orderBy: { createdAt: 'desc' },
