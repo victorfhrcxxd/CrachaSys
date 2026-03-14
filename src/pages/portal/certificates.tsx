@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Award, Download, Calendar, Clock, ExternalLink } from 'lucide-react';
 import CertificateTemplate from '@/components/CertificateTemplate';
 import { formatDate } from '@/utils/cn';
+import { renderCertificateToCanvas } from '@/utils/canvasRenderer';
 
 interface Certificate {
   id: string; verificationCode: string; issuedAt: string;
@@ -31,15 +32,54 @@ export default function PortalCertificates() {
     const el = certRefs.current[cert.id];
     if (!el) return;
     setPrinting(cert.id);
-    const { default: html2canvas } = await import('html2canvas');
-    const { default: jsPDF } = await import('jspdf');
-    const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-    const w = pdf.internal.pageSize.getWidth();
-    const h = (canvas.height / canvas.width) * w;
-    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, (pdf.internal.pageSize.getHeight() - h) / 2, w, h);
-    pdf.save(`certificado-${(cert.event?.name ?? 'evento').replace(/\s+/g, '-')}.pdf`);
-    setPrinting(null);
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const pw = pdf.internal.pageSize.getWidth();
+      const ph = pdf.internal.pageSize.getHeight();
+
+      // Tentar usar template do editor (Canvas 2D nativo, ~150 DPI)
+      let canvas: HTMLCanvasElement | null = null;
+      try {
+        if (cert.event) {
+          const eventRes = await fetch('/api/events').then(r => r.json());
+          const evArr = Array.isArray(eventRes) ? eventRes : [];
+          const ev = evArr.find((e: { name: string; id: string }) => e.name === cert.event!.name);
+          if (ev?.id) {
+            const tmplRes = await fetch(`/api/certificate-templates?eventId=${ev.id}`).then(r => r.json());
+            if (Array.isArray(tmplRes) && tmplRes.length > 0) {
+              const isJson = (url: string) => { try { JSON.parse(url); return true; } catch { return false; } };
+              const tpl = tmplRes.find((t: { isDefault?: boolean; fileUrl: string }) => t.isDefault && isJson(t.fileUrl))
+                       ?? tmplRes.find((t: { fileUrl: string }) => isJson(t.fileUrl));
+              if (tpl) {
+                const parsed = JSON.parse(tpl.fileUrl);
+                if (parsed?.design) {
+                  canvas = await renderCertificateToCanvas(parsed.design, {
+                    name: session?.user?.name ?? '',
+                    courseName: cert.event.name,
+                    issueDate: new Date(cert.issuedAt).toLocaleDateString('pt-BR'),
+                    workload: cert.event.workload ? `${cert.event.workload} horas` : '',
+                    verificationCode: cert.verificationCode,
+                    organization: cert.event.instructor ?? '',
+                  });
+                }
+              }
+            }
+          }
+        }
+      } catch { /* ignore — fallback abaixo */ }
+
+      // Fallback: html2canvas do template padrão (scale:5)
+      if (!canvas) {
+        const { default: html2canvas } = await import('html2canvas');
+        canvas = await html2canvas(el, { scale: 5, useCORS: true, allowTaint: true, backgroundColor: '#ffffff', logging: false });
+      }
+
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.97), 'JPEG', 0, 0, pw, ph);
+      pdf.save(`certificado-${(cert.event?.name ?? 'evento').replace(/\s+/g, '-')}.pdf`);
+    } finally {
+      setPrinting(null);
+    }
   };
 
   return (
