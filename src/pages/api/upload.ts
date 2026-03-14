@@ -3,9 +3,9 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/server/auth';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
-import type { Readable } from 'stream';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const Busboy = require('busboy') as typeof import('busboy').default;
+/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any */
+const Busboy: any = require('busboy');
+/* eslint-enable */
 
 // 20MB limit — suporta PDFs grandes
 export const config = { api: { bodyParser: false, sizeLimit: '20mb' } };
@@ -23,7 +23,7 @@ function parseFormData(req: NextApiRequest): Promise<{ buffer: Buffer; filename:
 
     let resolved = false;
 
-    busboy.on('file', (_field: string, stream: Readable & { truncated?: boolean }, info: { filename: string; mimeType: string }) => {
+    busboy.on('file', (_field: string, stream: NodeJS.ReadableStream & { resume(): void }, info: { filename: string; mimeType: string }) => {
       const { filename, mimeType } = info;
       const ext = filename.split('.').pop()?.toLowerCase() ?? 'jpg';
       
