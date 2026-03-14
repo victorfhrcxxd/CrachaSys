@@ -3,10 +3,10 @@
  * Toda a lógica de negócio de check-in via QR code.
  */
 
-import { prisma } from '../prisma';
 import { verifyQrToken } from '../qrToken';
 import { createAuditLog } from '../auditLog';
 import type { SessionUser } from '../session';
+import * as CheckinRepo from '../repositories/checkin/checkin.repository';
 
 export class CheckinError extends Error {
   constructor(
@@ -24,14 +24,8 @@ async function findParticipantByQr(qrToken: string) {
   const verified = verifyQrToken(qrToken);
 
   const participant = verified.valid
-    ? await prisma.participant.findUnique({
-        where: { id: verified.participantId },
-        include: { event: { select: { id: true, name: true } } },
-      })
-    : await prisma.participant.findUnique({
-        where: { qrToken },
-        include: { event: { select: { id: true, name: true } } },
-      });
+    ? await CheckinRepo.findParticipantById(verified.participantId)
+    : await CheckinRepo.findParticipantByToken(qrToken);
 
   if (!participant) {
     throw new CheckinError('QR Code inválido — participante não encontrado', 404);
@@ -74,12 +68,7 @@ export async function scanCheckin(user: SessionUser, input: ScanCheckinInput) {
 
   const participant = await findParticipantByQr(qrToken);
 
-  const eventDay = await prisma.eventDay.findUnique({
-    where: { id: eventDayId },
-    include: {
-      event: { select: { startDate: true, endDate: true, checkinWindowMinutes: true } },
-    },
-  });
+  const eventDay = await CheckinRepo.findEventDay(eventDayId);
 
   if (!eventDay || eventDay.eventId !== participant.eventId) {
     throw new CheckinError('Dia do evento inválido para este participante', 400);
@@ -87,10 +76,7 @@ export async function scanCheckin(user: SessionUser, input: ScanCheckinInput) {
 
   assertCheckinWindow(eventDay);
 
-  // Checa duplicata
-  const existing = await prisma.checkIn.findUnique({
-    where: { participantId_eventDayId: { participantId: participant.id, eventDayId } },
-  });
+  const existing = await CheckinRepo.findExistingCheckin(participant.id, eventDayId);
 
   const participantSummary = {
     id: participant.id,
@@ -109,9 +95,7 @@ export async function scanCheckin(user: SessionUser, input: ScanCheckinInput) {
     };
   }
 
-  const checkIn = await prisma.checkIn.create({
-    data: { participantId: participant.id, eventDayId, checkedInById: user.id },
-  });
+  const checkIn = await CheckinRepo.createCheckin(participant.id, eventDayId, user.id);
 
   await createAuditLog({
     userId: user.id,

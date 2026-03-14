@@ -3,29 +3,20 @@
  * Lógica de negócio para emissão de certificados.
  */
 
-import { prisma } from '../prisma';
 import { checkPlanLimit } from '../planLimits';
 import { createAuditLog } from '../auditLog';
 import type { SessionUser } from '../session';
-
-const certInclude = {
-  participant: { select: { id: true, name: true, email: true, company: true } },
-  event: { select: { id: true, name: true, workload: true, startDate: true, endDate: true, instructor: true } },
-} as const;
+import * as CertRepo from '../repositories/certificates/certificate.repository';
 
 // ── Queries ──────────────────────────────────────────────────────────────────
 
 export async function listCertificates(user: SessionUser) {
-  const companyId = user.role !== 'SUPER_ADMIN' ? user.companyId : undefined;
-  return prisma.certificate.findMany({
-    where: companyId ? { event: { companyId } } : {},
-    orderBy: { issuedAt: 'desc' },
-    include: certInclude,
-  });
+  if (user.role === 'SUPER_ADMIN') return CertRepo.findAllCertificates();
+  return CertRepo.findCertificatesByCompany(user.companyId);
 }
 
 export async function getCertificate(id: string) {
-  return prisma.certificate.findUnique({ where: { id }, include: certInclude });
+  return CertRepo.findCertificateById(id);
 }
 
 // ── Emissão individual ───────────────────────────────────────────────────────
@@ -43,10 +34,7 @@ export async function issueCertificate(
     );
   }
 
-  const cert = await prisma.certificate.create({
-    data: { participantId, eventId },
-    include: certInclude,
-  });
+  const cert = await CertRepo.createCertificate(participantId, eventId);
 
   await createAuditLog({
     userId: user.id,
@@ -63,13 +51,7 @@ export async function issueCertificate(
 // ── Elegibilidade para emissão em bulk ──────────────────────────────────────
 
 export async function calcEligible(eventId: string, threshold: number) {
-  const event = await prisma.event.findUnique({
-    where: { id: eventId },
-    include: {
-      days: true,
-      participants: { include: { checkins: true } },
-    },
-  });
+  const event = await CertRepo.findEventWithParticipantsForBulk(eventId);
   if (!event) return { eligible: [], belowThresholdCount: 0, totalParticipants: 0, totalDays: 0 };
 
   const totalDays = event.days.length || 1;
@@ -102,11 +84,9 @@ export async function bulkIssueCertificates(
   let alreadyHad = 0;
 
   for (const p of eligible) {
-    const existing = await prisma.certificate.findFirst({
-      where: { participantId: p.id, eventId },
-    });
+    const existing = await CertRepo.findExistingCertificate(p.id, eventId);
     if (existing) { alreadyHad++; continue; }
-    await prisma.certificate.create({ data: { participantId: p.id, eventId } });
+    await CertRepo.createCertificate(p.id, eventId);
     issued++;
   }
 
@@ -124,7 +104,7 @@ export async function bulkIssueCertificates(
 // ── Revogar ──────────────────────────────────────────────────────────────────
 
 export async function deleteCertificate(user: SessionUser, id: string) {
-  await prisma.certificate.delete({ where: { id } });
+  await CertRepo.deleteCertificateById(id);
   await createAuditLog({
     userId: user.id,
     companyId: user.companyId,
