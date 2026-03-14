@@ -15,15 +15,18 @@ import {
   QrCode,
   BarChart3,
   ShieldCheck,
+  FolderInput,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
 const mainNav = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/admin/events', label: 'Eventos', icon: CalendarDays },
+  { href: '/admin/import-event', label: 'Importar Evento', icon: FolderInput, exact: true },
   { href: '/admin/participants', label: 'Participantes', icon: Users },
   { href: '/checkin', label: 'Check-in QR', icon: QrCode },
 ];
+
 
 const toolsNav = [
   { href: '/admin/badges', label: 'Crachás', icon: CreditCard },
