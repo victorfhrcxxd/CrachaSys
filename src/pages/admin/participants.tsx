@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import AdminLayout from '@/components/layouts/AdminLayout';
+import { useEvents } from '@/hooks/useEvents';
+import { useParticipants } from '@/hooks/useParticipants';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +12,6 @@ import { Plus, Search, Upload, Download, Users, CheckCircle2, XCircle, QrCode, K
 import { formatDate } from '@/utils/cn';
 import QRCode from 'qrcode';
 
-interface Event { id: string; name: string; }
 interface CheckIn { eventDay: { label?: string; date: string } }
 interface Participant {
   id: string; name: string; email: string; company?: string; document?: string; phone?: string;
@@ -20,11 +21,11 @@ interface Participant {
 }
 
 export default function ParticipantsPage() {
-  const [events, setEvents] = useState<Event[]>([]);
+  const { events } = useEvents();
   const [selectedEventId, setSelectedEventId] = useState('');
-  const [participants, setParticipants] = useState<Participant[]>([]);
+  const { participants: rawParts, loading, refetch } = useParticipants(selectedEventId || null);
+  const participants = rawParts as unknown as Participant[];
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showQr, setShowQr] = useState<Participant | null>(null);
@@ -36,18 +37,10 @@ export default function ParticipantsPage() {
   const [copied, setCopied] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Auto-select first event on load
   useEffect(() => {
-    fetch('/api/events').then(r => r.json()).then(d => {
-      setEvents(d);
-      if (d.length > 0) setSelectedEventId(d[0].id);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!selectedEventId) return;
-    setLoading(true);
-    fetch(`/api/participants?eventId=${selectedEventId}`).then(r => r.json()).then(d => { setParticipants(d); setLoading(false); });
-  }, [selectedEventId]);
+    if (events.length > 0 && !selectedEventId) setSelectedEventId(events[0].id);
+  }, [events]);
 
   const filtered = participants.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -64,7 +57,7 @@ export default function ParticipantsPage() {
       setNewCredentials({ email: form.email, password: data._generatedPassword });
     }
     setForm({ name: '', email: '', company: '', document: '', phone: '', badgeRole: 'Participante' });
-    fetch(`/api/participants?eventId=${selectedEventId}`).then(r => r.json()).then(setParticipants);
+    refetch();
   };
 
   const copyCredentials = () => {
@@ -84,7 +77,7 @@ export default function ParticipantsPage() {
         const res = await fetch('/api/participants/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows: result.data, eventId: selectedEventId }) });
         const data = await res.json();
         setImportResult(data);
-        fetch(`/api/participants?eventId=${selectedEventId}`).then(r => r.json()).then(setParticipants);
+        refetch();
       },
     });
   };

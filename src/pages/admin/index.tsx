@@ -5,6 +5,8 @@ import { Users, CalendarDays, Award, QrCode, CheckCircle2, ArrowRight } from 'lu
 import { formatDate, getStatusColor, getStatusLabel, cn } from '@/utils/cn';
 import Link from 'next/link';
 import { useSelectedEvent } from '@/contexts/EventContext';
+import { useDashboardStats } from '@/hooks/useDashboardStats';
+import { useParticipants } from '@/hooks/useParticipants';
 
 interface Event { id: string; name: string; status: string; startDate: string; _count: { participants: number } }
 interface Participant { id: string; name: string; email: string; company: string | null; createdAt: string; badgeRole: string; checkins: { id: string }[] }
@@ -22,25 +24,8 @@ const STATUS_DOT: Record<string, string> = {
 
 export default function AdminDashboard() {
   const { selectedEventId } = useSelectedEvent();
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [participants, setParticipants] = useState<Participant[]>([]);
-  const [loadingParts, setLoadingParts] = useState(false);
-
-  useEffect(() => {
-    fetch('/api/stats')
-      .then((r) => r.json())
-      .then((data) => { setStats(data); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    if (!selectedEventId) return;
-    setLoadingParts(true);
-    fetch(`/api/participants?eventId=${selectedEventId}`)
-      .then(r => r.json())
-      .then(data => { setParticipants(Array.isArray(data) ? data : []); setLoadingParts(false); });
-  }, [selectedEventId]);
+  const { stats, loading }                             = useDashboardStats();
+  const { participants, loading: loadingParts }        = useParticipants(selectedEventId || null);
 
   const statCards = [
     { title: 'Eventos', value: stats?.totalEvents ?? 0, icon: CalendarDays, href: '/admin/events', iconColor: 'text-primary bg-primary/8' },
@@ -116,7 +101,7 @@ export default function AdminDashboard() {
                         <span className="text-[11px] bg-primary/8 text-primary px-1.5 py-0.5 rounded font-medium">
                           {p.badgeRole}
                         </span>
-                        {p.checkins.length > 0 && (
+                        {(p.checkins?.length ?? 0) > 0 && (
                           <CheckCircle2 className="w-3.5 h-3.5 text-success" />
                         )}
                       </div>

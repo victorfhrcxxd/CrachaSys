@@ -1,5 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import AdminLayout from '@/components/layouts/AdminLayout';
+import { useEvents } from '@/hooks/useEvents';
+import { useCertificates } from '@/hooks/useCertificates';
+import { useParticipants } from '@/hooks/useParticipants';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,44 +13,22 @@ import { Plus, Search, Trash2, Award, User, CalendarDays, ExternalLink, Users, P
 import Link from 'next/link';
 import { formatDate } from '@/utils/cn';
 
-interface Certificate {
-  id: string; verificationCode: string; issuedAt: string;
-  participant: { id: string; name: string; email: string; company?: string };
-  event: { id: string; name: string; workload?: number };
-}
-interface Participant { id: string; name: string; email: string; eventId: string; }
-interface Event { id: string; name: string; }
 interface BulkPreview { eligible: { id: string }[]; belowThresholdCount: number; totalParticipants: number; totalDays: number; }
 
 export default function CertificatesPage() {
-  const [certs, setCerts] = useState<Certificate[]>([]);
-  const [participants, setParticipants] = useState<Participant[]>([]);
-  const [events, setEvents] = useState<Event[]>([]);
+  const { certs, loading, refetch } = useCertificates();
+  const { events } = useEvents();
+  const [form, setForm] = useState({ participantId: '', eventId: '' });
+  const { participants: rawParts } = useParticipants(form.eventId || null);
+  const participants = rawParts as { id: string; name: string }[];
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [showBulkDialog, setShowBulkDialog] = useState(false);
-  const [form, setForm] = useState({ participantId: '', eventId: '' });
   const [bulkForm, setBulkForm] = useState({ eventId: '', minAttendancePercent: '75' });
   const [bulkPreview, setBulkPreview] = useState<BulkPreview | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkResult, setBulkResult] = useState<{ issued: number; alreadyHad: number } | null>(null);
   const [saving, setSaving] = useState(false);
-
-  const load = () => {
-    setLoading(true);
-    fetch('/api/certificates').then(r => r.json()).then(data => { setCerts(Array.isArray(data) ? data : []); setLoading(false); });
-  };
-
-  useEffect(() => {
-    load();
-    fetch('/api/events').then(r => r.json()).then((data: Event[]) => setEvents(Array.isArray(data) ? data : []));
-  }, []);
-
-  const loadParticipantsForEvent = (eventId: string) => {
-    if (!eventId) return;
-    fetch(`/api/participants?eventId=${eventId}`).then(r => r.json()).then((data: Participant[]) => setParticipants(Array.isArray(data) ? data : []));
-  };
 
   const filtered = certs.filter(c =>
     (c.participant?.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
@@ -57,7 +38,7 @@ export default function CertificatesPage() {
   const handleSave = async () => {
     setSaving(true);
     await fetch('/api/certificates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
-    setSaving(false); setShowDialog(false); setForm({ participantId: '', eventId: '' }); load();
+    setSaving(false); setShowDialog(false); setForm({ participantId: '', eventId: '' }); refetch();
   };
 
   const loadBulkPreview = async (eventId: string, percent: string) => {
@@ -87,13 +68,13 @@ export default function CertificatesPage() {
     const data = await r.json();
     setSaving(false);
     setBulkResult(data);
-    load();
+    refetch();
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir este certificado?')) return;
     await fetch(`/api/certificates/${id}`, { method: 'DELETE' });
-    load();
+    refetch();
   };
 
   return (
@@ -214,7 +195,7 @@ export default function CertificatesPage() {
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label>Evento *</Label>
-              <Select value={form.eventId} onValueChange={(v: string) => { setForm({ ...form, eventId: v, participantId: '' }); loadParticipantsForEvent(v); }}>
+              <Select value={form.eventId} onValueChange={(v: string) => { setForm({ ...form, eventId: v, participantId: '' }); }}>
                 <SelectTrigger><SelectValue placeholder="Selecione o evento..." /></SelectTrigger>
                 <SelectContent>{events.map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}</SelectContent>
               </Select>
