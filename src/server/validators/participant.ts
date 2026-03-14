@@ -9,10 +9,11 @@ export const CreateParticipantSchema = z.object({
   name:      z.string().min(2, 'Nome é obrigatório').max(300),
   email:     z.string().email('E-mail inválido').max(300),
   company:   z.string().max(300).optional(),
-  badgeRole: z.string().max(100).default('Participante'),
+  badgeRole: z.string().max(100).optional().transform(v => v ?? 'Participante'),
   eventId:   z.string().min(1, 'eventId é obrigatório'),
   photo:     z.string().url().optional().or(z.literal('')).transform(v => v || undefined),
 });
+
 
 export const UpdateParticipantSchema = CreateParticipantSchema.partial().omit({ eventId: true });
 
