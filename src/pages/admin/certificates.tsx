@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Trash2, Award, User, CalendarDays, ExternalLink, Users, Percent } from 'lucide-react';
+import { Plus, Search, Trash2, Award, User, CalendarDays, ExternalLink, Users, Percent, Pencil } from 'lucide-react';
+import Link from 'next/link';
 import { formatDate } from '@/utils/cn';
 
 interface Certificate {
@@ -104,6 +105,11 @@ export default function CertificatesPage() {
             <Input placeholder="Buscar certificados..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
           </div>
           <div className="flex gap-2 ml-auto">
+            <Button variant="outline" asChild className="gap-2">
+              <Link href="/admin/certificates/editor">
+                <Pencil className="w-4 h-4" />Editor de Template
+              </Link>
+            </Button>
             <Button variant="outline" onClick={() => { setBulkForm({ eventId: '', minAttendancePercent: '75' }); setBulkPreview(null); setBulkResult(null); setShowBulkDialog(true); }} className="gap-2">
               <Users className="w-4 h-4" />Emitir em Lote
             </Button>

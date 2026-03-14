@@ -25,7 +25,7 @@ const FONTS = [
 ];
 
 // ── Types ──────────────────────────────────────────────────────────────────
-type ElemType = 'name' | 'email' | 'company' | 'role' | 'event' | 'badgeNumber' | 'qrcode' | 'photo' | 'text' | 'rect' | 'image';
+type ElemType = 'name' | 'email' | 'company' | 'courseName' | 'issueDate' | 'workload' | 'verificationCode' | 'organization' | 'qrcode' | 'text' | 'rect' | 'image';
 
 interface BElem {
   id: string;
@@ -46,14 +46,23 @@ interface BElem {
 interface Design { background: string; backgroundImage?: string; elements: BElem[] }
 interface EventItem { id: string; name: string }
 
-// ── Constants ──────────────────────────────────────────────────────────────
-const W = 340;
-const H = 480;
+// ── Canvas size: A4 landscape at 96dpi ────────────────────────────────────
+const W = 794;
+const H = 562;
 
 const LABELS: Record<ElemType, string> = {
-  name: 'Nome', email: 'E-mail', company: 'Empresa', role: 'Função',
-  event: 'Nome do Evento', badgeNumber: 'Nº Crachá', qrcode: 'QR Code',
-  photo: 'Foto', text: 'Texto Livre', rect: 'Retângulo', image: 'Imagem',
+  name: 'Nome do Participante',
+  email: 'E-mail',
+  company: 'Órgão / Empresa',
+  courseName: 'Nome do Curso/Evento',
+  issueDate: 'Data de Emissão',
+  workload: 'Carga Horária',
+  verificationCode: 'Código de Verificação',
+  organization: 'Organização Emissora',
+  qrcode: 'QR Code',
+  text: 'Texto Livre',
+  rect: 'Retângulo',
+  image: 'Imagem',
 };
 
 function readFileAsDataURL(file: File): Promise<string> {
@@ -66,87 +75,80 @@ function readFileAsDataURL(file: File): Promise<string> {
 }
 
 const PREVIEW: Record<string, string> = {
-  name: 'Maria Souza', email: 'maria@empresa.com', company: 'TechCorp',
-  role: 'Palestrante', event: 'Summit Dev 2025', badgeNumber: 'A0042',
+  name: 'Maria da Silva Souza',
+  email: 'maria@empresa.com',
+  company: 'Câmara Municipal de Jaru',
+  courseName: 'Encontro Nacional do Poder Legislativo',
+  issueDate: new Date().toLocaleDateString('pt-BR'),
+  workload: '40 horas',
+  verificationCode: 'CERT-2025-00123',
+  organization: 'Instituto de Capacitação',
 };
 
 const DEFAULTS: Partial<Record<ElemType, Partial<BElem>>> = {
-  name:        { width: 260, height: 36, fontSize: 22, fontWeight: 'bold', color: '#0f172a', align: 'center' },
-  email:       { width: 240, height: 20, fontSize: 11, color: '#64748b',  align: 'center' },
-  company:     { width: 220, height: 20, fontSize: 12, color: '#475569',  align: 'center' },
-  role:        { width: 160, height: 26, fontSize: 13, fontWeight: 'bold', color: '#4f46e5', align: 'center' },
-  event:       { width: 260, height: 24, fontSize: 13, fontWeight: 'bold', color: '#0f172a', align: 'center' },
-  badgeNumber: { width: 120, height: 18, fontSize: 11, color: '#94a3b8',  align: 'left' },
-  qrcode:      { width: 80,  height: 80 },
-  photo:       { width: 100, height: 100, borderRadius: 50 },
-  text:        { width: 160, height: 28, fontSize: 12, color: '#0f172a',  align: 'center', content: 'Texto livre' },
-  rect:        { width: 340, height: 8,  bgColor: '#4f46e5', borderRadius: 0 },
-  image:       { width: 160, height: 120, borderRadius: 0 },
+  name:             { width: 500, height: 40, fontSize: 26, fontWeight: 'bold', color: '#0f172a', align: 'center' },
+  email:            { width: 320, height: 20, fontSize: 12, color: '#64748b', align: 'center' },
+  company:          { width: 400, height: 24, fontSize: 14, color: '#475569', align: 'center' },
+  courseName:       { width: 600, height: 36, fontSize: 22, fontWeight: 'bold', color: '#1e3a5f', align: 'center' },
+  issueDate:        { width: 220, height: 20, fontSize: 12, color: '#64748b', align: 'center' },
+  workload:         { width: 220, height: 20, fontSize: 12, color: '#475569', align: 'center' },
+  verificationCode: { width: 260, height: 18, fontSize: 11, color: '#94a3b8', align: 'center' },
+  organization:     { width: 300, height: 24, fontSize: 14, fontWeight: 'bold', color: '#1e3a5f', align: 'center' },
+  qrcode:           { width: 90, height: 90 },
+  text:             { width: 300, height: 28, fontSize: 14, color: '#0f172a', align: 'center', content: 'Texto livre' },
+  rect:             { width: 794, height: 8, bgColor: '#1e3a5f', borderRadius: 0 },
+  image:            { width: 200, height: 120, borderRadius: 0 },
 };
 
 // ── Starter Templates ──────────────────────────────────────────────────────
 const STARTERS: { name: string; design: Design }[] = [
   {
-    name: 'Profissional',
+    name: 'Clássico',
     design: {
       background: '#ffffff',
       elements: [
-        { id: 'p0', type: 'rect',        x: 0,   y: 0,   width: 340, height: 90,  bgColor: '#4f46e5', borderRadius: 0 },
-        { id: 'p1', type: 'event',       x: 16,  y: 14,  width: 308, height: 20,  fontSize: 11, color: '#c7d2fe', align: 'center' },
-        { id: 'p2', type: 'role',        x: 95,  y: 38,  width: 150, height: 24,  fontSize: 12, fontWeight: 'bold', color: '#ffffff', align: 'center' },
-        { id: 'p3', type: 'photo',       x: 120, y: 66,  width: 100, height: 100, borderRadius: 50 },
-        { id: 'p4', type: 'name',        x: 20,  y: 188, width: 300, height: 36,  fontSize: 22, fontWeight: 'bold', color: '#0f172a', align: 'center' },
-        { id: 'p5', type: 'company',     x: 20,  y: 228, width: 300, height: 20,  fontSize: 12, color: '#475569', align: 'center' },
-        { id: 'p6', type: 'email',       x: 20,  y: 252, width: 300, height: 18,  fontSize: 11, color: '#94a3b8', align: 'center' },
-        { id: 'p7', type: 'rect',        x: 20,  y: 284, width: 300, height: 1,   bgColor: '#e2e8f0', borderRadius: 0 },
-        { id: 'p8', type: 'qrcode',      x: 22,  y: 358, width: 80,  height: 80 },
-        { id: 'p9', type: 'badgeNumber', x: 115, y: 376, width: 195, height: 20,  fontSize: 12, color: '#64748b', align: 'left' },
-        { id: 'p10', type: 'text',       x: 115, y: 400, width: 195, height: 18,  fontSize: 10, color: '#94a3b8', align: 'left', content: 'Escaneie para check-in' },
+        { id: 's0', type: 'rect',             x: 0,   y: 0,   width: 794, height: 16,  bgColor: '#1e3a5f', borderRadius: 0 },
+        { id: 's1', type: 'rect',             x: 0,   y: 546, width: 794, height: 16,  bgColor: '#1e3a5f', borderRadius: 0 },
+        { id: 's2', type: 'organization',     x: 97,  y: 36,  width: 600, height: 24,  fontSize: 13, color: '#94a3b8', align: 'center' },
+        { id: 's3', type: 'text',             x: 97,  y: 60,  width: 600, height: 18,  fontSize: 10, color: '#94a3b8', align: 'center', content: 'CERTIFICADO DE PARTICIPAÇÃO' },
+        { id: 's4', type: 'text',             x: 97,  y: 100, width: 600, height: 18,  fontSize: 13, color: '#475569', align: 'center', content: 'Certificamos que' },
+        { id: 's5', type: 'name',             x: 97,  y: 126, width: 600, height: 48,  fontSize: 32, fontWeight: 'bold', color: '#0f172a', align: 'center' },
+        { id: 's6', type: 'company',          x: 97,  y: 180, width: 600, height: 20,  fontSize: 13, color: '#475569', align: 'center' },
+        { id: 's7', type: 'text',             x: 97,  y: 218, width: 600, height: 18,  fontSize: 13, color: '#475569', align: 'center', content: 'participou do evento' },
+        { id: 's8', type: 'courseName',       x: 97,  y: 244, width: 600, height: 34,  fontSize: 20, fontWeight: 'bold', color: '#1e3a5f', align: 'center' },
+        { id: 's9', type: 'workload',         x: 97,  y: 290, width: 600, height: 20,  fontSize: 13, color: '#475569', align: 'center' },
+        { id: 'sa', type: 'rect',             x: 247, y: 340, width: 300, height: 1,   bgColor: '#cbd5e1', borderRadius: 0 },
+        { id: 'sb', type: 'issueDate',        x: 247, y: 350, width: 300, height: 18,  fontSize: 11, color: '#94a3b8', align: 'center' },
+        { id: 'sc', type: 'qrcode',           x: 40,  y: 440, width: 80,  height: 80 },
+        { id: 'sd', type: 'verificationCode', x: 130, y: 472, width: 280, height: 18,  fontSize: 10, color: '#94a3b8', align: 'left' },
       ],
     },
   },
   {
-    name: 'Minimalista',
-    design: {
-      background: '#ffffff',
-      elements: [
-        { id: 'm0', type: 'name',        x: 20,  y: 60,  width: 300, height: 42,  fontSize: 24, fontWeight: 'bold', color: '#0f172a', align: 'center' },
-        { id: 'm1', type: 'rect',        x: 140, y: 110, width: 60,  height: 3,   bgColor: '#4f46e5', borderRadius: 2 },
-        { id: 'm2', type: 'role',        x: 20,  y: 126, width: 300, height: 26,  fontSize: 14, color: '#4f46e5', align: 'center' },
-        { id: 'm3', type: 'event',       x: 20,  y: 164, width: 300, height: 20,  fontSize: 12, color: '#64748b', align: 'center' },
-        { id: 'm4', type: 'company',     x: 20,  y: 188, width: 300, height: 18,  fontSize: 11, color: '#94a3b8', align: 'center' },
-        { id: 'm5', type: 'rect',        x: 20,  y: 306, width: 300, height: 1,   bgColor: '#e2e8f0', borderRadius: 0 },
-        { id: 'm6', type: 'qrcode',      x: 130, y: 322, width: 80,  height: 80 },
-        { id: 'm7', type: 'badgeNumber', x: 20,  y: 428, width: 300, height: 18,  fontSize: 11, color: '#94a3b8', align: 'center' },
-      ],
-    },
-  },
-  {
-    name: 'Corporativo',
+    name: 'Moderno',
     design: {
       background: '#f8fafc',
       elements: [
-        { id: 'c0',  type: 'rect',        x: 0,   y: 0,   width: 340, height: 120, bgColor: '#0f172a', borderRadius: 0 },
-        { id: 'c1',  type: 'text',        x: 16,  y: 18,  width: 308, height: 16,  fontSize: 9,  color: '#94a3b8', align: 'center', content: 'CREDENCIAL OFICIAL' },
-        { id: 'c2',  type: 'event',       x: 16,  y: 38,  width: 308, height: 28,  fontSize: 15, fontWeight: 'bold', color: '#ffffff', align: 'center' },
-        { id: 'c3',  type: 'rect',        x: 95,  y: 76,  width: 150, height: 26,  bgColor: '#4f46e5', borderRadius: 4 },
-        { id: 'c4',  type: 'role',        x: 95,  y: 76,  width: 150, height: 26,  fontSize: 11, fontWeight: 'bold', color: '#ffffff', align: 'center' },
-        { id: 'c5',  type: 'photo',       x: 120, y: 100, width: 100, height: 100, borderRadius: 8 },
-        { id: 'c6',  type: 'name',        x: 20,  y: 218, width: 300, height: 38,  fontSize: 22, fontWeight: 'bold', color: '#0f172a', align: 'center' },
-        { id: 'c7',  type: 'company',     x: 20,  y: 262, width: 300, height: 20,  fontSize: 13, color: '#475569', align: 'center' },
-        { id: 'c8',  type: 'rect',        x: 20,  y: 292, width: 300, height: 1,   bgColor: '#e2e8f0', borderRadius: 0 },
-        { id: 'c9',  type: 'email',       x: 20,  y: 306, width: 300, height: 18,  fontSize: 11, color: '#64748b', align: 'center' },
-        { id: 'c10', type: 'qrcode',      x: 22,  y: 382, width: 72,  height: 72 },
-        { id: 'c11', type: 'badgeNumber', x: 108, y: 396, width: 210, height: 20,  fontSize: 12, color: '#475569', align: 'left' },
-        { id: 'c12', type: 'text',        x: 108, y: 420, width: 210, height: 18,  fontSize: 10, color: '#94a3b8', align: 'left', content: 'Escaneie para check-in' },
+        { id: 'm0', type: 'rect',             x: 0,   y: 0,   width: 200, height: 562, bgColor: '#1e3a5f', borderRadius: 0 },
+        { id: 'm1', type: 'organization',     x: 210, y: 40,  width: 560, height: 20,  fontSize: 11, color: '#94a3b8', align: 'left' },
+        { id: 'm2', type: 'text',             x: 210, y: 70,  width: 560, height: 16,  fontSize: 10, color: '#64748b', align: 'left', content: 'CERTIFICADO DE PARTICIPAÇÃO' },
+        { id: 'm3', type: 'text',             x: 210, y: 130, width: 460, height: 18,  fontSize: 13, color: '#475569', align: 'left', content: 'Certificamos que' },
+        { id: 'm4', type: 'name',             x: 210, y: 156, width: 560, height: 44,  fontSize: 30, fontWeight: 'bold', color: '#0f172a', align: 'left' },
+        { id: 'm5', type: 'company',          x: 210, y: 206, width: 500, height: 20,  fontSize: 13, color: '#3b82f6', align: 'left' },
+        { id: 'm6', type: 'text',             x: 210, y: 250, width: 500, height: 18,  fontSize: 13, color: '#475569', align: 'left', content: 'participou com êxito do evento' },
+        { id: 'm7', type: 'courseName',       x: 210, y: 276, width: 560, height: 32,  fontSize: 20, fontWeight: 'bold', color: '#1e3a5f', align: 'left' },
+        { id: 'm8', type: 'workload',         x: 210, y: 320, width: 300, height: 18,  fontSize: 12, color: '#64748b', align: 'left' },
+        { id: 'm9', type: 'issueDate',        x: 210, y: 342, width: 300, height: 18,  fontSize: 12, color: '#64748b', align: 'left' },
+        { id: 'ma', type: 'qrcode',           x: 680, y: 440, width: 80,  height: 80 },
+        { id: 'mb', type: 'verificationCode', x: 210, y: 500, width: 400, height: 16,  fontSize: 10, color: '#94a3b8', align: 'left' },
       ],
     },
   },
 ];
 
-// ── Element renderer ───────────────────────────────────────────────────────
 type ResizeCorner = 'se' | 'sw' | 'ne' | 'nw';
 
+// ── Element renderer ───────────────────────────────────────────────────────
 function ElemView({ elem, isSelected, onMouseDown, onResizeStart, qrUrl }: {
   elem: BElem;
   isSelected: boolean;
@@ -158,7 +160,7 @@ function ElemView({ elem, isSelected, onMouseDown, onResizeStart, qrUrl }: {
     position: 'absolute', left: elem.x, top: elem.y,
     width: elem.width, height: elem.height,
     cursor: 'move', userSelect: 'none', boxSizing: 'border-box',
-    outline: isSelected ? '2px solid #4f46e5' : undefined,
+    outline: isSelected ? '2px solid #3b82f6' : undefined,
     outlineOffset: isSelected ? '1px' : undefined,
   };
 
@@ -186,15 +188,6 @@ function ElemView({ elem, isSelected, onMouseDown, onResizeStart, qrUrl }: {
         }
       </div>
     );
-  } else if (elem.type === 'photo') {
-    node = (
-      <div style={{ ...base, backgroundColor: '#f1f5f9', borderRadius: elem.borderRadius ?? 50, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={e => onMouseDown(e, elem.id)}>
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
-          <circle cx="12" cy="7" r="4" stroke="#94a3b8" strokeWidth="2" />
-        </svg>
-      </div>
-    );
   } else {
     const val = elem.type === 'text' ? (elem.content || 'Texto') : (PREVIEW[elem.type] || `[${LABELS[elem.type]}]`);
     node = (
@@ -214,7 +207,7 @@ function ElemView({ elem, isSelected, onMouseDown, onResizeStart, qrUrl }: {
 
   const handleStyle = (cursor: string): React.CSSProperties => ({
     position: 'absolute', width: 10, height: 10,
-    backgroundColor: '#4f46e5', borderRadius: 2, cursor, zIndex: 20,
+    backgroundColor: '#3b82f6', borderRadius: 2, cursor, zIndex: 20,
   });
 
   return (
@@ -222,16 +215,12 @@ function ElemView({ elem, isSelected, onMouseDown, onResizeStart, qrUrl }: {
       {node}
       {isSelected && (
         <>
-          {/* Bottom-right */}
           <div style={{ ...handleStyle('se-resize'), left: elem.x + elem.width - 5, top: elem.y + elem.height - 5 }}
             onMouseDown={e => { e.stopPropagation(); onResizeStart(e, elem.id, 'se'); }} />
-          {/* Bottom-left */}
           <div style={{ ...handleStyle('sw-resize'), left: elem.x - 5, top: elem.y + elem.height - 5 }}
             onMouseDown={e => { e.stopPropagation(); onResizeStart(e, elem.id, 'sw'); }} />
-          {/* Top-right */}
           <div style={{ ...handleStyle('ne-resize'), left: elem.x + elem.width - 5, top: elem.y - 5 }}
             onMouseDown={e => { e.stopPropagation(); onResizeStart(e, elem.id, 'ne'); }} />
-          {/* Top-left */}
           <div style={{ ...handleStyle('nw-resize'), left: elem.x - 5, top: elem.y - 5 }}
             onMouseDown={e => { e.stopPropagation(); onResizeStart(e, elem.id, 'nw'); }} />
         </>
@@ -241,13 +230,13 @@ function ElemView({ elem, isSelected, onMouseDown, onResizeStart, qrUrl }: {
 }
 
 // ── Main page ──────────────────────────────────────────────────────────────
-export default function BadgeEditorPage() {
+export default function CertificateEditorPage() {
   const router = useRouter();
   const { status } = useSession();
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const [design, setDesign] = useState<Design>({ background: '#ffffff', elements: [] });
-  const [templateName, setTemplateName] = useState('Novo Template');
+  const [templateName, setTemplateName] = useState('Novo Certificado');
   const [selected, setSelected] = useState<string | null>(null);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [eventId, setEventId] = useState('');
@@ -266,14 +255,14 @@ export default function BadgeEditorPage() {
       setEvents(evs);
       if (evs.length > 0) setEventId(evs[0].id);
     });
-    QRCode.toDataURL('PREVIEW', { width: 80, margin: 0 }).then(setQrUrl);
+    QRCode.toDataURL('PREVIEW', { width: 90, margin: 0 }).then(setQrUrl);
   }, [status]);
 
   // Load existing template from ?id=
   useEffect(() => {
     const id = router.query.id as string;
     if (!id) return;
-    fetch(`/api/badge-templates/${id}`).then(r => r.json()).then(data => {
+    fetch(`/api/certificate-templates/${id}`).then(r => r.json()).then(data => {
       if (!data?.fileUrl) return;
       try {
         const parsed = JSON.parse(data.fileUrl);
@@ -307,7 +296,7 @@ export default function BadgeEditorPage() {
           ...d,
           elements: d.elements.map(el => el.id !== dragging.id ? el : {
             ...el,
-            x: Math.max(0, Math.min(W - el.width,  dragging.ox + dx)),
+            x: Math.max(0, Math.min(W - el.width, dragging.ox + dx)),
             y: Math.max(0, Math.min(H - el.height, dragging.oy + dy)),
           }),
         }));
@@ -364,9 +353,9 @@ export default function BadgeEditorPage() {
 
   const addElem = (type: ElemType) => {
     const def = DEFAULTS[type] || {};
-    const w = (def.width as number) || 160;
+    const w = (def.width as number) || 200;
     const h = (def.height as number) || 30;
-    const el: BElem = { id: `e_${Date.now()}`, type, x: Math.round((W - w) / 2), y: 200, width: w, height: h, ...def };
+    const el: BElem = { id: `e_${Date.now()}`, type, x: Math.round((W - w) / 2), y: Math.round((H - h) / 2), width: w, height: h, ...def };
     setDesign(d => ({ ...d, elements: [...d.elements, el] }));
     setSelected(el.id);
   };
@@ -399,8 +388,8 @@ export default function BadgeEditorPage() {
     setSaving(true);
     const body = { name: templateName, eventId, fileUrl: JSON.stringify({ name: templateName, design }) };
     const res = savedId
-      ? await fetch(`/api/badge-templates/${savedId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-      : await fetch('/api/badge-templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      ? await fetch(`/api/certificate-templates/${savedId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      : await fetch('/api/certificate-templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (res.ok) { const data = await res.json(); setSavedId(data.id); }
     setSaving(false);
   };
@@ -409,14 +398,16 @@ export default function BadgeEditorPage() {
     if (!canvasRef.current) return;
     const { default: html2canvas } = await import('html2canvas');
     const { default: jsPDF } = await import('jspdf');
-    const canvas = await html2canvas(canvasRef.current, { scale: 3, useCORS: true, backgroundColor: design.background });
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [86, 120] });
-    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 86, 120);
-    pdf.save(`template-${templateName.replace(/\s+/g, '-')}.pdf`);
+    const canvas = await html2canvas(canvasRef.current, { scale: 2, useCORS: true, backgroundColor: design.background });
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pw = pdf.internal.pageSize.getWidth();
+    const ph = pdf.internal.pageSize.getHeight();
+    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pw, ph);
+    pdf.save(`certificado-${templateName.replace(/\s+/g, '-')}.pdf`);
   };
 
   const sel = design.elements.find(el => el.id === selected) ?? null;
-  const isText = (t: ElemType) => !['qrcode', 'photo', 'rect', 'image'].includes(t);
+  const isText = (t: ElemType) => !['qrcode', 'rect', 'image'].includes(t);
 
   const imgInputRef = useRef<HTMLInputElement>(null);
   const bgInputRef = useRef<HTMLInputElement>(null);
@@ -439,6 +430,9 @@ export default function BadgeEditorPage() {
 
   const removeBgImage = () => setDesign(d => ({ ...d, backgroundImage: undefined }));
 
+  // Scale canvas to fit screen
+  const scale = 0.72;
+
   return (
     <>
     <Head>
@@ -450,7 +444,7 @@ export default function BadgeEditorPage() {
 
       {/* ── Topbar ── */}
       <header className="h-[54px] bg-surface border-b border-border flex items-center px-4 gap-3 flex-shrink-0">
-        <Link href="/admin/badges" className="text-muted-foreground hover:text-foreground transition-colors">
+        <Link href="/admin/certificates" className="text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div className="w-px h-4 bg-border" />
@@ -475,11 +469,11 @@ export default function BadgeEditorPage() {
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── Left: Palette ── */}
-        <aside className="w-[176px] bg-sidebar border-r border-sidebar-border flex flex-col flex-shrink-0 overflow-y-auto scrollbar-thin">
+        <aside className="w-[190px] bg-sidebar border-r border-sidebar-border flex flex-col flex-shrink-0 overflow-y-auto scrollbar-thin">
           <div className="px-3 pt-3 pb-2">
             <p className="text-[10px] font-semibold text-muted-foreground/40 uppercase tracking-widest mb-2">Campos</p>
             <div className="space-y-0.5">
-              {(['name', 'email', 'company', 'role', 'event', 'badgeNumber'] as ElemType[]).map(t => (
+              {(['name', 'company', 'courseName', 'issueDate', 'workload', 'verificationCode', 'organization', 'email'] as ElemType[]).map(t => (
                 <button key={t} onClick={() => addElem(t)}
                   className="w-full text-left text-[12px] px-2.5 py-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors flex items-center gap-2">
                   <Plus className="w-3 h-3 flex-shrink-0" />{LABELS[t]}
@@ -491,7 +485,7 @@ export default function BadgeEditorPage() {
           <div className="px-3 pt-2 pb-2 border-t border-sidebar-border">
             <p className="text-[10px] font-semibold text-muted-foreground/40 uppercase tracking-widest mb-2">Elementos</p>
             <div className="space-y-0.5">
-              {(['qrcode', 'photo', 'image', 'text', 'rect'] as ElemType[]).map(t => (
+              {(['qrcode', 'image', 'text', 'rect'] as ElemType[]).map(t => (
                 <button key={t} onClick={() => addElem(t)}
                   className="w-full text-left text-[12px] px-2.5 py-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors flex items-center gap-2">
                   <Plus className="w-3 h-3 flex-shrink-0" />{LABELS[t]}
@@ -546,7 +540,18 @@ export default function BadgeEditorPage() {
         >
           <div
             ref={canvasRef}
-            style={{ width: W, height: H, backgroundColor: design.background, backgroundImage: design.backgroundImage ? `url(${design.backgroundImage})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative', flexShrink: 0, boxShadow: '0 8px 40px rgba(0,0,0,0.20)', fontFamily: '"Inter","Helvetica Neue",sans-serif' }}
+            style={{
+              width: W, height: H,
+              backgroundColor: design.background,
+              backgroundImage: design.backgroundImage ? `url(${design.backgroundImage})` : undefined,
+              backgroundSize: 'cover', backgroundPosition: 'center',
+              position: 'relative', flexShrink: 0,
+              boxShadow: '0 8px 40px rgba(0,0,0,0.20)',
+              fontFamily: '"Inter","Helvetica Neue",sans-serif',
+              transform: `scale(${scale})`,
+              transformOrigin: 'top center',
+              marginBottom: `-${Math.round(H * (1 - scale))}px`,
+            }}
             onClick={e => e.stopPropagation()}
           >
             {design.elements.map(el => (
@@ -555,15 +560,16 @@ export default function BadgeEditorPage() {
             ))}
             {design.elements.length === 0 && (
               <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#94a3b8', pointerEvents: 'none' }}>
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 9h6M9 12h6M9 15h4" strokeLinecap="round" /></svg>
-                <p style={{ fontSize: 12 }}>Escolha um template ou adicione elementos</p>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 9h6M9 12h6M9 15h4" strokeLinecap="round" /></svg>
+                <p style={{ fontSize: 14 }}>Escolha um template ou adicione elementos</p>
+                <p style={{ fontSize: 11, color: '#cbd5e1' }}>Canvas A4 • 794 × 562 px</p>
               </div>
             )}
           </div>
         </div>
 
         {/* ── Right: Properties ── */}
-        <aside className="w-[216px] bg-sidebar border-l border-sidebar-border flex flex-col flex-shrink-0 overflow-y-auto scrollbar-thin">
+        <aside className="w-[220px] bg-sidebar border-l border-sidebar-border flex flex-col flex-shrink-0 overflow-y-auto scrollbar-thin">
           {sel ? (
             <div className="p-3 space-y-4">
               {/* Header */}
@@ -588,7 +594,6 @@ export default function BadgeEditorPage() {
                     </div>
                   ))}
                 </div>
-                {/* W/H com +/- */}
                 {([['W', 'width', sel.width], ['H', 'height', sel.height]] as [string, keyof BElem, number][]).map(([label, key, val]) => (
                   <div key={key as string} className="flex items-center gap-1 mt-1.5">
                     <label className="text-[10px] text-muted-foreground w-5 flex-shrink-0">{label}</label>
@@ -610,13 +615,10 @@ export default function BadgeEditorPage() {
                 <div>
                   <p className="text-[10px] text-muted-foreground/40 uppercase tracking-widest mb-2">Tipografia</p>
                   <div className="space-y-2">
-                    {/* Fonte */}
                     <div>
                       <label className="text-[10px] text-muted-foreground block mb-1">Fonte</label>
                       <Select value={sel.fontFamily || FONTS[0].value} onValueChange={v => updateSel({ fontFamily: v })}>
-                        <SelectTrigger className="h-6 text-[11px]">
-                          <SelectValue />
-                        </SelectTrigger>
+                        <SelectTrigger className="h-6 text-[11px]"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {FONTS.map(f => (
                             <SelectItem key={f.value} value={f.value} className="text-[12px]">
@@ -626,7 +628,6 @@ export default function BadgeEditorPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    {/* Tamanho */}
                     <div className="flex items-center gap-1">
                       <label className="text-[10px] text-muted-foreground w-12 flex-shrink-0">Tamanho</label>
                       <button onClick={() => updateSel({ fontSize: Math.max(6, (sel.fontSize || 14) - 1) })}
@@ -639,7 +640,6 @@ export default function BadgeEditorPage() {
                         className="w-6 h-6 flex items-center justify-center rounded border border-border text-muted-foreground hover:bg-muted">
                         <Plus className="w-3 h-3" /></button>
                     </div>
-                    {/* Cor + estilo */}
                     <div className="flex items-center gap-1.5">
                       <label className="text-[10px] text-muted-foreground w-12 flex-shrink-0">Cor</label>
                       <input type="color" value={sel.color || '#000000'}
@@ -708,25 +708,6 @@ export default function BadgeEditorPage() {
                         <img src={sel.imageData} alt="preview" className="w-full h-full object-cover" />
                       </div>
                     )}
-                    <div className="flex items-center gap-1.5">
-                      <label className="text-[10px] text-muted-foreground w-12 flex-shrink-0">Raio</label>
-                      <Input type="number" value={sel.borderRadius ?? 0}
-                        onChange={e => updateSel({ borderRadius: +e.target.value })}
-                        className="h-6 text-[11px] px-1.5 flex-1 font-mono" />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Photo radius */}
-              {sel.type === 'photo' && (
-                <div>
-                  <p className="text-[10px] text-muted-foreground/40 uppercase tracking-widest mb-2">Foto</p>
-                  <div className="flex items-center gap-1.5">
-                    <label className="text-[10px] text-muted-foreground w-12 flex-shrink-0">Raio</label>
-                    <Input type="number" value={sel.borderRadius ?? 50}
-                      onChange={e => updateSel({ borderRadius: +e.target.value })}
-                      className="h-6 text-[11px] px-1.5 flex-1 font-mono" />
                   </div>
                 </div>
               )}
