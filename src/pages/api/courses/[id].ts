@@ -1,39 +1,41 @@
+/**
+ * api/courses/[id].ts
+ * Alias legado de /api/events/[id] — mantido para compatibilidade de clientes antigos.
+ */
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/server/auth';
-import { prisma } from '@/server/prisma';
+import { withApiHandler } from '@/server/handler';
+import { requireAdmin } from '@/server/session';
+import { ok, noContent, notFound, methodNotAllowed } from '@/server/response';
+import { parseBody } from '@/server/validators/common';
+import { UpdateEventSchema } from '@/server/validators/event';
+import { getEvent, updateEvent, deleteEvent } from '@/server/services/event.service';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getServerSession(req, res, authOptions);
-  if (!session || session.user?.role !== 'ADMIN') return res.status(401).json({ error: 'Não autorizado' });
-
+export default withApiHandler(async (req: NextApiRequest, res: NextApiResponse) => {
   const { id } = req.query as { id: string };
 
   if (req.method === 'GET') {
-    const event = await prisma.event.findUnique({
-      where: { id },
-      include: {
-        participants: { select: { id: true, name: true, email: true, company: true, badgeRole: true } },
-        _count: { select: { certificates: true, participants: true } },
-      },
-    });
-    if (!event) return res.status(404).json({ error: 'Evento não encontrado' });
-    return res.json(event);
+    await requireAdmin(req, res);
+    const event = await getEvent(id);
+    if (!event) return notFound(res, 'Evento não encontrado');
+    return ok(res, event);
   }
 
   if (req.method === 'PUT') {
-    const { name, description, instructor, location, startDate, endDate, workload, capacity, status } = req.body;
-    const event = await prisma.event.update({
-      where: { id },
-      data: { name, description, instructor, location, startDate: startDate ? new Date(startDate) : undefined, endDate: endDate ? new Date(endDate) : undefined, workload: workload ? Number(workload) : null, capacity: capacity ? Number(capacity) : null, status },
-    });
-    return res.json(event);
+    const user  = await requireAdmin(req, res);
+    const event = await getEvent(id);
+    if (!event) return notFound(res, 'Evento não encontrado');
+    const input   = parseBody(UpdateEventSchema, req.body);
+    const updated = await updateEvent(user, id, input);
+    return ok(res, updated);
   }
 
   if (req.method === 'DELETE') {
-    await prisma.event.delete({ where: { id } });
-    return res.status(204).end();
+    const user  = await requireAdmin(req, res);
+    const event = await getEvent(id);
+    if (!event) return notFound(res, 'Evento não encontrado');
+    await deleteEvent(user, id);
+    return noContent(res);
   }
 
-  return res.status(405).json({ error: 'Método não permitido' });
-}
+  return methodNotAllowed(res);
+});

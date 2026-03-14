@@ -1,30 +1,35 @@
+import { z } from 'zod';
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/server/auth';
-import { prisma } from '@/server/prisma';
 import bcrypt from 'bcryptjs';
+import { withApiHandler } from '@/server/handler';
+import { requireAdmin } from '@/server/session';
+import { ok, created, methodNotAllowed } from '@/server/response';
+import { parseBody } from '@/server/validators/common';
+import { prisma } from '@/server/prisma';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+// POST é público (auto-cadastro de membro), GET requer admin
+const RegisterSchema = z.object({
+  name:     z.string().min(2),
+  email:    z.string().email(),
+  password: z.string().min(6),
+});
+
+export default withApiHandler(async (req: NextApiRequest, res: NextApiResponse) => {
   if (req.method === 'POST') {
-    const { name, email, password } = req.body;
-    if (!name || !email || !password) return res.status(400).json({ error: 'Campos obrigatórios ausentes' });
-
+    // Rota pública — auto-cadastro de membro (sem auth)
+    const { name, email, password } = parseBody(RegisterSchema, req.body);
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return res.status(409).json({ error: 'Email já cadastrado' });
-
-    const hashed = await bcrypt.hash(password, 12);
     const user = await prisma.user.create({
-      data: { name, email, password: hashed, role: 'MEMBER' },
+      data: { name, email, password: await bcrypt.hash(password, 12), role: 'MEMBER' },
       select: { id: true, name: true, email: true, role: true, createdAt: true },
     });
-    return res.status(201).json(user);
+    return created(res, user);
   }
-
-  const session = await getServerSession(req, res, authOptions);
-  if (!session || session.user?.role !== 'ADMIN') return res.status(401).json({ error: 'Não autorizado' });
 
   if (req.method === 'GET') {
     const { search } = req.query;
+    await requireAdmin(req, res);
     const members = await prisma.user.findMany({
       where: {
         role: 'MEMBER',
@@ -33,8 +38,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       orderBy: { createdAt: 'desc' },
       select: { id: true, name: true, email: true, photo: true, isActive: true, createdAt: true },
     });
-    return res.json(members);
+    return ok(res, members);
   }
 
-  return res.status(405).json({ error: 'Método não permitido' });
-}
+  return methodNotAllowed(res);
+});

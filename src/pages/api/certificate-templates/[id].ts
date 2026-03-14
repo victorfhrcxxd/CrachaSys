@@ -1,34 +1,39 @@
+import { z } from 'zod';
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/server/auth';
+import { withApiHandler } from '@/server/handler';
+import { requireAuth, requireAdmin } from '@/server/session';
+import { ok, noContent, notFound, methodNotAllowed } from '@/server/response';
+import { parseBody } from '@/server/validators/common';
 import { prisma } from '@/server/prisma';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) return res.status(401).json({ error: 'Unauthorized' });
+const UpdateCertTemplateSchema = z.object({
+  name:      z.string().min(1).optional(),
+  fileUrl:   z.string().min(1).optional(),
+  isDefault: z.boolean().optional(),
+});
 
-  const { id } = req.query;
+export default withApiHandler(async (req: NextApiRequest, res: NextApiResponse) => {
+  const { id } = req.query as { id: string };
 
   if (req.method === 'GET') {
-    const template = await prisma.certificateTemplate.findUnique({ where: { id: String(id) } });
-    if (!template) return res.status(404).json({ error: 'Not found' });
-    return res.json(template);
+    await requireAuth(req, res);
+    const template = await prisma.certificateTemplate.findUnique({ where: { id } });
+    if (!template) return notFound(res, 'Template não encontrado');
+    return ok(res, template);
   }
 
   if (req.method === 'PUT') {
-    const { name, fileUrl, isDefault } = req.body;
-    const template = await prisma.certificateTemplate.update({
-      where: { id: String(id) },
-      data: { ...(name && { name }), ...(fileUrl && { fileUrl }), ...(isDefault !== undefined && { isDefault }) },
-    });
-    return res.json(template);
+    await requireAdmin(req, res);
+    const data = parseBody(UpdateCertTemplateSchema, req.body);
+    const template = await prisma.certificateTemplate.update({ where: { id }, data });
+    return ok(res, template);
   }
 
   if (req.method === 'DELETE') {
-    await prisma.certificateTemplate.delete({ where: { id: String(id) } });
-    return res.status(204).end();
+    await requireAdmin(req, res);
+    await prisma.certificateTemplate.delete({ where: { id } });
+    return noContent(res);
   }
 
-  res.setHeader('Allow', ['GET', 'PUT', 'DELETE']);
-  res.status(405).end();
-}
+  return methodNotAllowed(res);
+});

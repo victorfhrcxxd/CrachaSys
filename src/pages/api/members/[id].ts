@@ -1,46 +1,52 @@
+import { z } from 'zod';
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/server/auth';
-import { prisma } from '@/server/prisma';
 import bcrypt from 'bcryptjs';
+import { withApiHandler } from '@/server/handler';
+import { requireAuth } from '@/server/session';
+import { ok, noContent, notFound, methodNotAllowed, forbidden } from '@/server/response';
+import { parseBody } from '@/server/validators/common';
+import { prisma } from '@/server/prisma';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) return res.status(401).json({ error: 'Não autorizado' });
+const memberSelect = {
+  id: true, name: true, email: true, photo: true, isActive: true, role: true, createdAt: true,
+} as const;
 
-  const { id } = req.query as { id: string };
-  const isAdmin = session.user?.role === 'ADMIN';
-  const isSelf = session.user?.id === id;
+const UpdateMemberSchema = z.object({
+  name:     z.string().min(2).optional(),
+  email:    z.string().email().optional(),
+  photo:    z.string().optional(),
+  isActive: z.boolean().optional(),
+  password: z.string().min(6).optional(),
+});
 
-  if (!isAdmin && !isSelf) return res.status(403).json({ error: 'Proibido' });
+export default withApiHandler(async (req: NextApiRequest, res: NextApiResponse) => {
+  const viewer = await requireAuth(req, res);
+  const { id }  = req.query as { id: string };
+
+  const isAdmin = viewer.role === 'ADMIN' || viewer.role === 'SUPER_ADMIN';
+  const isSelf  = viewer.id === id;
+  if (!isAdmin && !isSelf) return forbidden(res, 'Acesso negado');
 
   if (req.method === 'GET') {
-    const user = await prisma.user.findUnique({
-      where: { id },
-      select: { id: true, name: true, email: true, photo: true, isActive: true, role: true, createdAt: true },
-    });
-    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
-    return res.json(user);
+    const user = await prisma.user.findUnique({ where: { id }, select: memberSelect });
+    if (!user) return notFound(res, 'Usuário não encontrado');
+    return ok(res, user);
   }
 
   if (req.method === 'PUT') {
-    const { name, email, photo, isActive, password } = req.body;
-    const updateData: Record<string, unknown> = { name, email, photo };
-    if (isAdmin && typeof isActive === 'boolean') updateData.isActive = isActive;
-    if (password) updateData.password = await bcrypt.hash(password, 12);
-    const user = await prisma.user.update({
-      where: { id },
-      data: updateData,
-      select: { id: true, name: true, email: true, photo: true, isActive: true },
-    });
-    return res.json(user);
+    const { name, email, photo, isActive, password } = parseBody(UpdateMemberSchema, req.body);
+    const data: Record<string, unknown> = { name, email, photo };
+    if (isAdmin && typeof isActive === 'boolean') data.isActive = isActive;
+    if (password) data.password = await bcrypt.hash(password, 12);
+    const user = await prisma.user.update({ where: { id }, data, select: memberSelect });
+    return ok(res, user);
   }
 
   if (req.method === 'DELETE') {
-    if (!isAdmin) return res.status(403).json({ error: 'Proibido' });
+    if (!isAdmin) return forbidden(res, 'Apenas administradores podem excluir membros');
     await prisma.user.delete({ where: { id } });
-    return res.status(204).end();
+    return noContent(res);
   }
 
-  return res.status(405).json({ error: 'Método não permitido' });
-}
+  return methodNotAllowed(res);
+});
