@@ -40,17 +40,31 @@ export default function CertificateVerificationPage() {
         if (d.event?.id) {
           try {
             const tmplRes = await fetch(`/api/certificate-templates?eventId=${d.event.id}`);
-            const templates: TemplateData[] = await tmplRes.json();
+            const templates: (TemplateData & { isDefault?: boolean })[] = await tmplRes.json();
             if (Array.isArray(templates) && templates.length > 0) {
-              // Preferir o isDefault:true, fallback para o primeiro
-              const tmpl = (templates as (TemplateData & { isDefault?: boolean })[]).find(t => t.isDefault) ?? templates[0];
+              // Preferir templates JSON (com elementos do editor) sobre URL de imagem
+              const isJson = (url: string) => { try { JSON.parse(url); return true; } catch { return false; } };
+              const jsonTemplates = templates.filter(t => isJson(t.fileUrl));
+              const tmpl =
+                jsonTemplates.find(t => t.isDefault) ??
+                jsonTemplates[0] ??
+                templates.find(t => t.isDefault) ??
+                templates[0];
               try {
                 const parsed = JSON.parse(tmpl.fileUrl);
                 if (parsed?.design) setCertDesign(parsed.design as CertDesign);
               } catch {
                 // fileUrl é URL de imagem — usar como backgroundImage
                 if (tmpl.fileUrl.startsWith('http') || /\.(jpe?g|png|webp)$/i.test(tmpl.fileUrl)) {
-                  setCertDesign({ background: '#ffffff', backgroundImage: tmpl.fileUrl, elements: [] });
+                  // Adicionar elemento de nome sobreposto na imagem de fundo
+                  setCertDesign({
+                    background: '#ffffff',
+                    backgroundImage: tmpl.fileUrl,
+                    elements: [
+                      { id: 'auto_name', type: 'name', x: 97, y: 155, width: 600, height: 50, fontSize: 30, fontWeight: 'bold', color: '#1a1a1a', align: 'center' },
+                      { id: 'auto_company', type: 'company', x: 97, y: 212, width: 600, height: 24, fontSize: 14, color: '#374151', align: 'center' },
+                    ],
+                  });
                 }
               }
             }

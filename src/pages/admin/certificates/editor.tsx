@@ -258,7 +258,35 @@ export default function CertificateEditorPage() {
     QRCode.toDataURL('PREVIEW', { width: 90, margin: 0 }).then(setQrUrl);
   }, [status]);
 
-  // Load existing template from ?id=
+  // Quando o eventId muda E não há template carregado, busca template existente do evento
+  useEffect(() => {
+    if (!eventId || savedId) return;
+    fetch(`/api/certificate-templates?eventId=${eventId}`)
+      .then(r => r.json())
+      .then((templates: { fileUrl: string; name: string; id: string; isDefault?: boolean }[]) => {
+        if (!Array.isArray(templates) || templates.length === 0) return;
+        // Preferir JSON (editor) sobre imagem pura
+        const isJson = (url: string) => { try { JSON.parse(url); return true; } catch { return false; } };
+        const jsonTemplates = templates.filter(t => isJson(t.fileUrl));
+        const tmpl = jsonTemplates.find(t => t.isDefault) ?? jsonTemplates[0] ?? templates.find(t => t.isDefault) ?? templates[0];
+        try {
+          const parsed = JSON.parse(tmpl.fileUrl);
+          if (parsed?.design) {
+            setDesign(parsed.design);
+            setTemplateName(parsed.name || tmpl.name);
+            setSavedId(tmpl.id);
+          }
+        } catch {
+          if (tmpl.fileUrl.startsWith('http') || /\.(jpe?g|png|webp)$/i.test(tmpl.fileUrl)) {
+            setDesign({ background: '#ffffff', backgroundImage: tmpl.fileUrl, elements: [] });
+            setTemplateName(tmpl.name);
+            setSavedId(tmpl.id);
+          }
+        }
+      })
+      .catch(() => {/* sem template para este evento */});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventId]);
   useEffect(() => {
     const id = router.query.id as string;
     if (!id) return;
@@ -386,7 +414,7 @@ export default function CertificateEditorPage() {
   const handleSave = async () => {
     if (!eventId) { alert('Selecione um evento!'); return; }
     setSaving(true);
-    const body = { name: templateName, eventId, fileUrl: JSON.stringify({ name: templateName, design }) };
+    const body = { name: templateName, eventId, fileUrl: JSON.stringify({ name: templateName, design }), isDefault: true };
     const res = savedId
       ? await fetch(`/api/certificate-templates/${savedId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       : await fetch('/api/certificate-templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
