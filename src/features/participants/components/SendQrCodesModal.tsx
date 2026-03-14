@@ -71,7 +71,7 @@ export function SendQrCodesModal({
 
   return (
     <Dialog open={open} onOpenChange={v => { if (!v) handleClose(); }}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-[16px]">
             <Mail className="w-5 h-5 text-primary" /> Enviar QR Codes por E-mail
