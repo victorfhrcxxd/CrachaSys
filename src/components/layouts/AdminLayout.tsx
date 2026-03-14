@@ -24,7 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 const mainNav = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/admin/events', label: 'Eventos', icon: CalendarDays },
-  { href: '/admin/import-event', label: 'Importar Evento', icon: FolderInput, exact: true },
+  { href: '/admin/criar-evento', label: 'Criar Evento', icon: FolderInput, exact: true },
   { href: '/admin/participants', label: 'Participantes', icon: Users },
   { href: '/checkin', label: 'Check-in QR', icon: QrCode },
 ];
