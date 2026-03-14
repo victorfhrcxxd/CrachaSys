@@ -1,28 +1,37 @@
+import { z } from 'zod';
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/server/auth';
+import { withApiHandler } from '@/server/handler';
+import { requireAuth, requireAdmin } from '@/server/session';
+import { ok, created, methodNotAllowed } from '@/server/response';
+import { parseBody } from '@/server/validators/common';
 import { prisma } from '@/server/prisma';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) return res.status(401).json({ error: 'Unauthorized' });
+const CreateTemplateSchema = z.object({
+  name:      z.string().min(1),
+  eventId:   z.string().min(1),
+  fileUrl:   z.string().min(1),
+  isDefault: z.boolean().default(false),
+});
 
+export default withApiHandler(async (req: NextApiRequest, res: NextApiResponse) => {
   if (req.method === 'GET') {
+    await requireAuth(req, res);
     const { eventId } = req.query;
-    const where = eventId ? { eventId: String(eventId) } : {};
-    const templates = await prisma.badgeTemplate.findMany({ where, orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }] });
-    return res.json(templates);
+    const templates = await prisma.badgeTemplate.findMany({
+      where: eventId ? { eventId: String(eventId) } : {},
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+    });
+    return ok(res, templates);
   }
 
   if (req.method === 'POST') {
-    const { name, eventId, fileUrl, isDefault } = req.body;
-    if (!name || !eventId || !fileUrl) return res.status(400).json({ error: 'Missing fields' });
+    await requireAdmin(req, res);
+    const { name, eventId, fileUrl, isDefault } = parseBody(CreateTemplateSchema, req.body);
     const template = await prisma.badgeTemplate.create({
-      data: { name, eventId, fileUrl, isDefault: isDefault ?? false },
+      data: { name, eventId, fileUrl, isDefault },
     });
-    return res.status(201).json(template);
+    return created(res, template);
   }
 
-  res.setHeader('Allow', ['GET', 'POST']);
-  res.status(405).end();
-}
+  return methodNotAllowed(res);
+});
