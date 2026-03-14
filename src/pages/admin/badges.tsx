@@ -55,7 +55,8 @@ export default function BadgesPage() {
 
     fetch(`/api/badge-templates?eventId=${selectedEventId}`).then(r => r.json()).then((data: SavedTemplate[]) => {
       if (!Array.isArray(data) || data.length === 0) return;
-      const first = data[0];
+      // Prefere o template marcado como padrão; se não houver, usa o primeiro
+      const first = data.find(t => (t as SavedTemplate & { isDefault?: boolean }).isDefault) ?? data[0];
       try {
         const parsed = JSON.parse(first.fileUrl);
         if (parsed?.design) {

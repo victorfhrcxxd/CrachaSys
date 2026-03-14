@@ -10,7 +10,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'GET') {
     const { eventId } = req.query;
     const where = eventId ? { eventId: String(eventId) } : {};
-    const templates = await prisma.badgeTemplate.findMany({ where, orderBy: { createdAt: 'desc' } });
+    const templates = await prisma.badgeTemplate.findMany({ where, orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }] });
     return res.json(templates);
   }
 
