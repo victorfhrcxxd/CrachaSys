@@ -7,12 +7,8 @@
 import { prisma } from '../prisma';
 import type { CreateEventInput, UpdateEventInput } from '../validators/event';
 
-// ── Tipos de retorno ─────────────────────────────────────────────────────────
-
-const eventListSelect = {
-  id: true, name: true, description: true, location: true, city: true,
-  startDate: true, endDate: true, status: true, companyId: true,
-  instructor: true, workload: true, capacity: true, checkinWindowMinutes: true,
+// include: aceita SOMENTE relações — escalares vêm automaticamente
+const eventInclude = {
   days: { orderBy: { date: 'asc' } as const },
   attendanceRule: true,
   _count: { select: { participants: true, certificates: true } },
@@ -24,14 +20,14 @@ export async function findEventsByCompany(companyId: string) {
   return prisma.event.findMany({
     where: { companyId },
     orderBy: { startDate: 'desc' },
-    include: eventListSelect,
+    include: eventInclude,
   });
 }
 
 export async function findAllEvents() {
   return prisma.event.findMany({
     orderBy: { startDate: 'desc' },
-    include: eventListSelect,
+    include: eventInclude,
   });
 }
 
