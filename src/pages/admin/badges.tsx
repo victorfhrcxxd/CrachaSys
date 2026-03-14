@@ -59,10 +59,35 @@ export default function BadgesPage() {
       try {
         const parsed = JSON.parse(first.fileUrl);
         if (parsed?.design) {
+          // Template JSON do editor — usa BadgeDesign completo
           setActiveTemplate(parsed.design as BadgeDesign);
           setActiveTemplateId(first.id);
         }
-      } catch { /* not a JSON template */ }
+      } catch {
+        // fileUrl é uma URL de imagem direta — usa como fundo com texto sobreposto
+        const isImageUrl = /\.(jpe?g|png|webp|gif|pdf)(\?.*)?$/i.test(first.fileUrl) || first.fileUrl.startsWith('http');
+        if (isImageUrl) {
+          const imageDesign: BadgeDesign = {
+            background: '#ffffff',
+            backgroundImage: first.fileUrl,
+            elements: [
+              // Nome do participante (parte inferior da imagem)
+              { id: 'name', type: 'name', x: 20, y: 310, width: 300, height: 36,
+                fontSize: 20, fontWeight: 'bold', color: '#0f172a', align: 'center' },
+              // Empresa/Órgão
+              { id: 'company', type: 'company', x: 20, y: 350, width: 300, height: 22,
+                fontSize: 12, fontWeight: 'normal', color: '#475569', align: 'center' },
+              // Número do crachá
+              { id: 'badgeNumber', type: 'badgeNumber', x: 260, y: 10, width: 70, height: 20,
+                fontSize: 10, fontWeight: 'normal', color: 'rgba(255,255,255,0.8)', align: 'right' },
+              // QR Code
+              { id: 'qrcode', type: 'qrcode', x: 20, y: 390, width: 70, height: 70 },
+            ],
+          };
+          setActiveTemplate(imageDesign);
+          setActiveTemplateId(first.id);
+        }
+      }
     });
   }, [selectedEventId]);
 
