@@ -97,6 +97,7 @@ export default function AdminDashboard() {
                         <p className="text-[13px] font-medium text-foreground truncate leading-none">{p.name}</p>
                         <p className="text-[11px] text-muted-foreground truncate mt-0.5">{p.email}</p>
                       </div>
+
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         <span className="text-[11px] bg-primary/8 text-primary px-1.5 py-0.5 rounded font-medium">
                           {p.badgeRole}

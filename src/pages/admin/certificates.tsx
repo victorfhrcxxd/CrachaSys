@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import AdminLayout from '@/components/layouts/AdminLayout';
 import { useEvents } from '@/hooks/useEvents';
 import { useCertificates } from '@/hooks/useCertificates';
@@ -14,21 +14,26 @@ import Link from 'next/link';
 import { formatDate } from '@/utils/cn';
 
 interface BulkPreview { eligible: { id: string }[]; belowThresholdCount: number; totalParticipants: number; totalDays: number; }
+interface Participant { id: string; name: string; } // Assuming Participant type for clarity
 
 export default function CertificatesPage() {
-  const { certs, loading, refetch } = useCertificates();
+  const { certs, loading, refetch: load } = useCertificates();
   const { events } = useEvents();
-  const [form, setForm] = useState({ participantId: '', eventId: '' });
-  const { participants: rawParts } = useParticipants(form.eventId || null);
-  const participants = rawParts as { id: string; name: string }[];
+  
   const [search, setSearch] = useState('');
   const [showDialog, setShowDialog] = useState(false);
   const [showBulkDialog, setShowBulkDialog] = useState(false);
+  
+  const [form, setForm] = useState({ participantId: '', eventId: '' });
   const [bulkForm, setBulkForm] = useState({ eventId: '', minAttendancePercent: '75' });
   const [bulkPreview, setBulkPreview] = useState<BulkPreview | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkResult, setBulkResult] = useState<{ issued: number; alreadyHad: number } | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Carrega os participantes sob demanda quando modal manual abre e evento é selecionado
+  const { participants: rawParts } = useParticipants(form.eventId || null);
+  const participants = rawParts as unknown as Participant[];
 
   const filtered = certs.filter(c =>
     (c.participant?.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
@@ -38,7 +43,7 @@ export default function CertificatesPage() {
   const handleSave = async () => {
     setSaving(true);
     await fetch('/api/certificates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
-    setSaving(false); setShowDialog(false); setForm({ participantId: '', eventId: '' }); refetch();
+    setSaving(false); setShowDialog(false); setForm({ participantId: '', eventId: '' }); load();
   };
 
   const loadBulkPreview = async (eventId: string, percent: string) => {
@@ -68,13 +73,13 @@ export default function CertificatesPage() {
     const data = await r.json();
     setSaving(false);
     setBulkResult(data);
-    refetch();
+    load();
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir este certificado?')) return;
     await fetch(`/api/certificates/${id}`, { method: 'DELETE' });
-    refetch();
+    load();
   };
 
   return (
