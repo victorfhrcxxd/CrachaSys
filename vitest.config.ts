@@ -27,7 +27,7 @@ export default defineConfig({
     setupFiles: ['./tests/setup/setup.ts'],
     testTimeout: 30_000,
     pool: 'forks',
-    poolOptions: { forks: { singleFork: true } },
+    maxWorkers: 1,
     include: ['tests/integration/**/*.test.ts'],
     reporters: ['verbose'],
     env: {
