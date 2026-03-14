@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import AdminLayout from '@/components/layouts/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { Users, CheckCircle2, Award, BarChart3, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useSelectedEvent } from '@/contexts/EventContext';
 
 interface Event { id: string; name: string; }
 interface AttendanceDay { label: string; count: number; }
@@ -22,17 +22,9 @@ interface ReportData {
 const BAR_COLORS = ['#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe'];
 
 export default function ReportsPage() {
-  const [events, setEvents] = useState<Event[]>([]);
-  const [selectedEventId, setSelectedEventId] = useState('');
+  const { selectedEventId } = useSelectedEvent();
   const [report, setReport] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    fetch('/api/events').then(r => r.json()).then(d => {
-      setEvents(d);
-      if (d.length > 0) setSelectedEventId(d[0].id);
-    });
-  }, []);
 
   useEffect(() => {
     if (!selectedEventId) return;
@@ -51,13 +43,7 @@ export default function ReportsPage() {
   return (
     <AdminLayout title="Relatórios">
       <div className="space-y-6">
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="w-72">
-            <Select value={selectedEventId} onValueChange={setSelectedEventId}>
-              <SelectTrigger><SelectValue placeholder="Selecionar evento..." /></SelectTrigger>
-              <SelectContent>{events.map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
+        <div className="flex items-center gap-4 flex-wrap justify-end">
           {report && (
             <Button variant="outline" className="ml-auto gap-2" onClick={exportCsv}>
               <Download className="w-4 h-4" />Exportar CSV

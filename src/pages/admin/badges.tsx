@@ -3,40 +3,32 @@ import AdminLayout from '@/components/layouts/AdminLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Download, Search, CreditCard, Pencil, Layers, Award, QrCode, Archive } from 'lucide-react';
 import BadgeTemplate from '@/components/BadgeTemplate';
 import BadgeRenderer, { BadgeDesign } from '@/components/BadgeRenderer';
 import QRCode from 'qrcode';
 import Link from 'next/link';
+import { useSelectedEvent } from '@/contexts/EventContext';
 
 interface Participant {
   id: string; name: string; email: string; company?: string;
   badgeRole: string; photo?: string; qrToken: string;
   certificate?: { verificationCode: string } | null;
 }
-interface Event { id: string; name: string; }
 interface SavedTemplate { id: string; fileUrl: string; name: string; }
 
 export default function BadgesPage() {
+  const { selectedEventId, selectedEvent } = useSelectedEvent();
   const [participants, setParticipants] = useState<Participant[]>([]);
-  const [events, setEvents] = useState<Event[]>([]);
-  const [selectedEventId, setSelectedEventId] = useState('');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [qrCodes, setQrCodes] = useState<Record<string, string>>({});
   const badgeRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const [eventName, setEventName] = useState('');
   const [activeTemplate, setActiveTemplate] = useState<BadgeDesign | null>(null);
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch('/api/events').then(r => r.json()).then((data: Event[]) => {
-      const evs = Array.isArray(data) ? data : [];
-      setEvents(evs);
-      if (evs.length > 0) { setSelectedEventId(evs[0].id); setEventName(evs[0].name); }
-    });
-  }, []);
+  const eventName = selectedEvent?.name ?? '';
+
 
   useEffect(() => {
     if (!selectedEventId) return;
@@ -50,8 +42,6 @@ export default function BadgesPage() {
       setLoading(false);
     });
 
-    const ev = events.find(e => e.id === selectedEventId);
-    if (ev) setEventName(ev.name);
 
     fetch(`/api/badge-templates?eventId=${selectedEventId}`).then(r => r.json()).then((data: SavedTemplate[]) => {
       if (!Array.isArray(data) || data.length === 0) return;
@@ -193,12 +183,6 @@ export default function BadgesPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <Input placeholder="Buscar participante..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
           </div>
-          <Select value={selectedEventId} onValueChange={(v: string) => setSelectedEventId(v)}>
-            <SelectTrigger className="w-64"><SelectValue placeholder="Selecionar evento..." /></SelectTrigger>
-            <SelectContent>
-              {events.map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
           <div className="ml-auto flex items-center gap-2">
             {activeTemplate && activeTemplateId && (
               <div className="flex items-center gap-1.5 text-[12px] text-primary bg-primary/8 px-2.5 py-1 rounded-md">

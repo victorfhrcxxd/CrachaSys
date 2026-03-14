@@ -4,6 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Users, CalendarDays, Award, QrCode, CheckCircle2, ArrowRight } from 'lucide-react';
 import { formatDate, getStatusColor, getStatusLabel, cn } from '@/utils/cn';
 import Link from 'next/link';
+import { useSelectedEvent } from '@/contexts/EventContext';
 
 interface Event { id: string; name: string; status: string; startDate: string; _count: { participants: number } }
 interface Participant { id: string; name: string; email: string; company: string | null; createdAt: string; badgeRole: string; checkins: { id: string }[] }
@@ -20,10 +21,9 @@ const STATUS_DOT: Record<string, string> = {
 };
 
 export default function AdminDashboard() {
+  const { selectedEventId } = useSelectedEvent();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [events, setEvents] = useState<Event[]>([]);
-  const [selectedEventId, setSelectedEventId] = useState('');
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loadingParts, setLoadingParts] = useState(false);
 
@@ -32,12 +32,6 @@ export default function AdminDashboard() {
       .then((r) => r.json())
       .then((data) => { setStats(data); setLoading(false); })
       .catch(() => setLoading(false));
-    fetch('/api/events')
-      .then(r => r.json())
-      .then((data: Event[]) => {
-        setEvents(data);
-        if (data.length > 0) setSelectedEventId(data[0].id);
-      });
   }, []);
 
   useEffect(() => {
@@ -99,16 +93,6 @@ export default function AdminDashboard() {
               <Link href="/admin/participants" className="text-[12px] text-primary hover:text-primary/80 transition-colors font-medium">
                 Ver todos
               </Link>
-            </div>
-            <div className="px-3 py-2 border-b border-border">
-              <Select value={selectedEventId} onValueChange={(v: string) => setSelectedEventId(v)}>
-                <SelectTrigger className="h-7 text-[12px] border-0 bg-muted/50 focus:ring-0 focus:ring-offset-0">
-                  <SelectValue placeholder="Selecionar evento..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {events.map(e => <SelectItem key={e.id} value={e.id} className="text-[13px]">{e.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
             </div>
             <div className="flex-1 overflow-y-auto max-h-64 scrollbar-thin">
               {loadingParts ? (

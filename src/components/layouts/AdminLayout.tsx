@@ -18,6 +18,8 @@ import {
   FolderInput,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { useSelectedEvent } from '@/contexts/EventContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const mainNav = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
@@ -27,13 +29,21 @@ const mainNav = [
   { href: '/checkin', label: 'Check-in QR', icon: QrCode },
 ];
 
-
 const toolsNav = [
   { href: '/admin/badges', label: 'Crachás', icon: CreditCard },
   { href: '/admin/certificates', label: 'Certificados', icon: Award },
   { href: '/admin/reports', label: 'Relatórios', icon: BarChart3 },
   { href: '/admin/users', label: 'Usuários', icon: UserCog },
   { href: '/admin/audit', label: 'Auditoria', icon: ShieldCheck },
+];
+
+// Páginas onde o seletor de evento aparece no header
+const EVENT_SELECTOR_PATHS = [
+  '/admin',
+  '/admin/badges',
+  '/admin/certificates',
+  '/admin/reports',
+  '/admin/participants',
 ];
 
 interface NavItemProps {
@@ -80,6 +90,12 @@ interface AdminLayoutProps {
 export default function AdminLayout({ children, title, description, actions }: AdminLayoutProps) {
   const { data: session } = useSession();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const router = useRouter();
+  const { events, selectedEventId, setSelectedEventId } = useSelectedEvent();
+
+  const showEventSelector = EVENT_SELECTOR_PATHS.some(p =>
+    p === '/admin' ? router.pathname === p : router.pathname.startsWith(p)
+  );
 
   const initials =
     session?.user?.name
@@ -184,6 +200,26 @@ export default function AdminLayout({ children, title, description, actions }: A
               <p className="text-[12px] text-muted-foreground mt-0.5 truncate">{description}</p>
             )}
           </div>
+
+          {/* ── Seletor de Evento Global ── */}
+          {showEventSelector && events.length > 0 && (
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <CalendarDays className="w-3.5 h-3.5 text-muted-foreground hidden sm:block flex-shrink-0" />
+              <Select value={selectedEventId} onValueChange={setSelectedEventId}>
+                <SelectTrigger className="h-7 w-[180px] sm:w-[220px] text-[12px] border-border bg-muted/40 hover:bg-muted transition-colors focus:ring-1">
+                  <SelectValue placeholder="Selecionar evento..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {events.map(e => (
+                    <SelectItem key={e.id} value={e.id} className="text-[13px]">
+                      {e.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {actions && <div className="flex items-center gap-2 flex-shrink-0">{actions}</div>}
         </header>
 
