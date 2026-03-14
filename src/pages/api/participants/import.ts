@@ -1,81 +1,59 @@
+import { z } from 'zod';
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/server/auth';
-import { prisma } from '@/server/prisma';
+import { withApiHandler } from '@/server/handler';
+import { requireAdmin } from '@/server/session';
+import { ok, methodNotAllowed } from '@/server/response';
+import { parseBody } from '@/server/validators/common';
+import type { ImportParticipantRow } from '@/server/validators/participant.validator';
+import { importParticipants } from '@/server/services/participant.service';
 
 export const config = { api: { bodyParser: { sizeLimit: '10mb' } } };
 
-// Helper to normalize column names: remove leading numbers/dots and convert to lowercase
-function normalizeColumnName(key: string): string {
-  return key.replace(/^\d+\.\s*/, '').trim().toLowerCase();
+const ImportBodySchema = z.object({
+  eventId: z.string().min(1, 'eventId é obrigatório'),
+  rows:    z.array(z.record(z.string())).min(1, 'Nenhuma linha enviada'),
+});
+
+/** Maps raw papaparse row (arbitrary column names) to a typed ImportParticipantRow. */
+function normalizeRow(raw: Record<string, string>): ImportParticipantRow | null {
+  const col = (key: string) => (raw[key] ?? '').trim();
+  const name  = col('nome do aluno') || col('nome') || col('name');
+  const email = (col('e-mail') || col('email')).toLowerCase();
+  if (!name || !email) return null;
+  return {
+    name,
+    email,
+    company:   col('órgão público') || col('orgao publico') || col('empresa') || col('company') || undefined,
+    document:  col('cpf') || col('documento') || col('document') || undefined,
+    phone:     col('telefone') || col('phone') || undefined,
+    badgeRole: col('funcao') || col('função') || col('role') || undefined,
+  };
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido' });
+export default withApiHandler(async (req: NextApiRequest, res: NextApiResponse) => {
+  if (req.method !== 'POST') return methodNotAllowed(res);
 
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) return res.status(401).json({ error: 'Não autorizado' });
+  await requireAdmin(req, res);
 
-  const isAdmin = session.user?.role === 'ADMIN' || session.user?.role === 'SUPER_ADMIN';
-  if (!isAdmin) return res.status(403).json({ error: 'Apenas administradores' });
+  const { eventId, rows: rawRows } = parseBody(ImportBodySchema, req.body);
 
-  const { rows, eventId } = req.body as { rows: Record<string, string>[]; eventId: string };
-  if (!rows?.length || !eventId) return res.status(400).json({ error: 'Dados inválidos' });
+  const validRows: ImportParticipantRow[] = [];
+  const parseErrors: string[] = [];
 
-  const created: string[] = [];
-  const errors: string[] = [];
-  const skipped: string[] = [];
-  const processedEmailsInBatch = new Set<string>(); // To deduplicate within the current CSV batch
-
-  for (const originalRow of rows) {
-    // Normalize row keys for easier access
-    const row: Record<string, string> = {};
-    for (const key in originalRow) {
-      if (Object.prototype.hasOwnProperty.call(originalRow, key)) {
-        row[normalizeColumnName(key)] = originalRow[key];
-      }
-    }
-
-    // Suporta: "Nome do Aluno", "nome", "name"
-    const name = (row['nome do aluno'] || row['nome'] || row['name'] || '').trim();
-    // Suporta: "E-mail", "email"
-    const email = (row['e-mail'] || row['email'] || '').trim().toLowerCase();
-
-    if (!name || !email) {
-      errors.push(`Linha inválida (nome ou email ausente): ${JSON.stringify(originalRow)}`);
-      continue;
-    }
-
-    // Deduplicate within the current batch
-    if (processedEmailsInBatch.has(email)) {
-      skipped.push(`${email} (duplicado no arquivo)`);
-      continue;
-    }
-    processedEmailsInBatch.add(email);
-
-    try {
-      const existing = await prisma.participant.findUnique({ where: { email_eventId: { email, eventId } } });
-      if (existing) {
-        skipped.push(`${email} (já cadastrado)`);
-        continue;
-      }
-
-      await prisma.participant.create({
-        data: {
-          name,
-          email,
-          company: (row['órgão público'] || row['orgao publico'] || row['empresa'] || row['company'] || '').trim() || null,
-          document: (row['cpf'] || row['documento'] || row['document'] || '').trim() || null,
-          phone: (row['telefone'] || row['phone'] || '').trim() || null,
-          badgeRole: (row['funcao'] || row['função'] || row['role'] || 'Participante').trim(),
-          eventId,
-        },
-      });
-      created.push(email);
-    } catch (e) {
-      errors.push(`${email}: ${String(e)}`);
+  for (const raw of rawRows) {
+    const mapped = normalizeRow(raw as Record<string, string>);
+    if (mapped) {
+      validRows.push(mapped);
+    } else {
+      parseErrors.push(`Linha inválida (nome ou email ausente): ${JSON.stringify(raw)}`);
     }
   }
 
-  return res.json({ created: created.length, skipped: skipped.length, errors });
-}
+  const result = await importParticipants(eventId, validRows);
+
+  return ok(res, {
+    created: result.created,
+    skipped: result.skipped,
+    errors:  [...parseErrors, ...result.errors],
+  });
+});
